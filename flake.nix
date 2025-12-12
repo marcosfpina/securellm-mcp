@@ -67,49 +67,49 @@
             # Copy TypeScript config for reference
             cp tsconfig.json $out/lib/mcp-server/ || true
 
-            # Create executable wrapper
-            cat > $out/bin/securellm-mcp <<'EOF'
-            #!/usr/bin/env bash
-            # SecureLLM Bridge MCP Server
-            # Wrapper script for running the MCP server
+            # Create executable wrapper with proper path substitution
+            cat > $out/bin/securellm-mcp <<EOF
+#!/usr/bin/env bash
+# SecureLLM Bridge MCP Server
+# Wrapper script for running the MCP server
 
-            # Set default environment variables if not set
-            : ''${PROJECT_ROOT:=/etc/nixos}
-            : ''${KNOWLEDGE_DB_PATH:=/var/lib/mcp-knowledge/knowledge.db}
-            : ''${ENABLE_KNOWLEDGE:=true}
+# Set default environment variables if not set
+: \''${PROJECT_ROOT:=/etc/nixos}
+: \''${KNOWLEDGE_DB_PATH:=/var/lib/mcp-knowledge/knowledge.db}
+: \''${ENABLE_KNOWLEDGE:=true}
 
-            # Export for MCP server
-            export PROJECT_ROOT
-            export KNOWLEDGE_DB_PATH
-            export ENABLE_KNOWLEDGE
+# Export for MCP server
+export PROJECT_ROOT
+export KNOWLEDGE_DB_PATH
+export ENABLE_KNOWLEDGE
 
-            # Run the MCP server
-            exec ${pkgs.nodejs}/bin/node $out/lib/mcp-server/build/src/index.js "$@"
-            EOF
+# Run the MCP server
+exec ${pkgs.nodejs}/bin/node $out/lib/mcp-server/build/src/index.js "\$@"
+EOF
             chmod +x $out/bin/securellm-mcp
 
             # Create development wrapper (uses local build)
-            cat > $out/bin/securellm-mcp-dev <<'EOF'
-            #!/usr/bin/env bash
-            # Development mode - runs from source directory
+            cat > $out/bin/securellm-mcp-dev <<EOF
+#!/usr/bin/env bash
+# Development mode - runs from source directory
 
-            DEV_DIR="''${1:-.}"
-            if [ ! -f "$DEV_DIR/build/src/index.js" ]; then
-              echo "Error: No build found in $DEV_DIR"
-              echo "Run: cd $DEV_DIR && npm run build"
-              exit 1
-            fi
+DEV_DIR="\''${1:-.}"
+if [ ! -f "\$DEV_DIR/build/src/index.js" ]; then
+  echo "Error: No build found in \$DEV_DIR"
+  echo "Run: cd \$DEV_DIR && npm run build"
+  exit 1
+fi
 
-            : ''${PROJECT_ROOT:=$DEV_DIR}
-            : ''${KNOWLEDGE_DB_PATH:=/var/lib/mcp-knowledge/knowledge.db}
-            : ''${ENABLE_KNOWLEDGE:=true}
+: \''${PROJECT_ROOT:=\$DEV_DIR}
+: \''${KNOWLEDGE_DB_PATH:=/var/lib/mcp-knowledge/knowledge.db}
+: \''${ENABLE_KNOWLEDGE:=true}
 
-            export PROJECT_ROOT
-            export KNOWLEDGE_DB_PATH
-            export ENABLE_KNOWLEDGE
+export PROJECT_ROOT
+export KNOWLEDGE_DB_PATH
+export ENABLE_KNOWLEDGE
 
-            exec ${pkgs.nodejs}/bin/node "$DEV_DIR/build/src/index.js"
-            EOF
+exec ${pkgs.nodejs}/bin/node "\$DEV_DIR/build/src/index.js"
+EOF
             chmod +x $out/bin/securellm-mcp-dev
           '';
 
