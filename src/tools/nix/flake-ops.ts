@@ -1,10 +1,13 @@
 /**
  * Nix Flake Operations
- * 
+ *
  * Provides operations for Nix flakes: build, check, update, etc.
+ *
+ * REFACTORED [MCP-2]: Async execution to prevent event loop blocking
  */
 
-import { execSync } from 'child_process';
+import { executeNixCommand, executeNixCommandStreaming } from './utils/async-exec.js';
+import { logger } from '../../utils/logger.js';
 import type { FlakeBuildResult, FlakeOperation, FlakeMetadata } from '../../types/nix-tools.js';
 
 /**
@@ -44,14 +47,16 @@ export class FlakeOps {
    */
   public async show(): Promise<FlakeMetadata> {
     try {
-      const output = execSync('nix flake metadata --json', {
-        cwd: this.projectRoot,
-        encoding: 'utf-8',
-        timeout: 10000,
-      });
+      const output = await executeNixCommand(
+        ['flake', 'metadata', '--json'],
+        {
+          cwd: this.projectRoot,
+          timeout: 10000,
+        }
+      );
 
       const metadata = JSON.parse(output);
-      
+
       return {
         description: metadata.description || '',
         lastModified: metadata.lastModified || 0,
@@ -69,11 +74,13 @@ export class FlakeOps {
    */
   public async eval(expression: string): Promise<string> {
     try {
-      const output = execSync(`nix eval --raw '${expression}'`, {
-        cwd: this.projectRoot,
-        encoding: 'utf-8',
-        timeout: 5000,
-      });
+      const output = await executeNixCommand(
+        ['eval', '--raw', expression],
+        {
+          cwd: this.projectRoot,
+          timeout: 5000,
+        }
+      );
 
       return output.trim();
     } catch (error: any) {
@@ -90,7 +97,7 @@ export class FlakeOps {
   }
 
   /**
-   * Execute flake command
+   * Execute flake command (async, non-blocking)
    */
   private async executeFlakeCommand(
     operation: FlakeOperation,
@@ -105,15 +112,60 @@ export class FlakeOps {
     try {
       const flakeRef = target ? `.#${target}` : '.';
       const args = ['flake', operation, flakeRef, ...extraArgs].filter(Boolean);
-      
-      const output = execSync(`nix ${args.join(' ')}`, {
-        cwd: this.projectRoot,
-        encoding: 'utf-8',
-        timeout: 120000, // 2 minutes
-        maxBuffer: 10 * 1024 * 1024, // 10MB
-      });
 
-      logs.push(output);
+      // Use streaming for long operations (build, check)
+      const useStreaming = ['build', 'check'].includes(operation);
+
+      let output: string;
+
+      if (useStreaming) {
+        logger.info(
+          { operation, target, args },
+          "Starting long-running Nix flake operation"
+        );
+
+        const result = await executeNixCommandStreaming(
+          args,
+          {
+            cwd: this.projectRoot,
+            timeout: 120000,  // 2 minutes for builds
+          },
+          (chunk) => {
+            // Stream stdout to logs
+            logs.push(chunk);
+          },
+          (chunk) => {
+            // Stream stderr (may contain warnings)
+            const foundWarnings = this.extractWarnings(chunk);
+            warnings.push(...foundWarnings);
+          }
+        );
+
+        output = result.stdout;
+
+        if (result.failed) {
+          const foundErrors = this.extractErrors(result.stderr);
+          errors.push(...foundErrors);
+
+          return {
+            operation,
+            success: false,
+            logs,
+            errors,
+            warnings,
+            duration: Date.now() - startTime,
+            exitCode: result.exitCode,
+          };
+        }
+      } else {
+        // For quick operations (update, develop), use simple execution
+        output = await executeNixCommand(args, {
+          cwd: this.projectRoot,
+          timeout: 30000,  // 30s for non-build operations
+        });
+
+        logs.push(output);
+      }
 
       // Parse output for paths
       const outputPath = this.extractOutputPath(output);
@@ -133,11 +185,13 @@ export class FlakeOps {
         exitCode: 0,
       };
     } catch (error: any) {
-      const output = error.stdout || error.stderr || '';
-      logs.push(output);
+      logger.error(
+        { err: error, operation, target },
+        "Nix flake operation failed"
+      );
 
-      // Parse errors
-      const foundErrors = this.extractErrors(output);
+      const errorMessage = error.message || '';
+      const foundErrors = this.extractErrors(errorMessage);
       errors.push(...foundErrors);
 
       return {
@@ -147,7 +201,7 @@ export class FlakeOps {
         errors,
         warnings,
         duration: Date.now() - startTime,
-        exitCode: error.status || 1,
+        exitCode: 1,
       };
     }
   }

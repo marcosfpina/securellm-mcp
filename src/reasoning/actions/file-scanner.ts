@@ -1,10 +1,12 @@
 /**
  * File Scanner Proactive Action
- * 
+ *
  * Scans for files matching entities extracted from input.
+ *
+ * REFACTORED [MCP-2]: Async execution to prevent event loop blocking
  */
 
-import { execSync } from 'child_process';
+import { executeRipgrep } from '../../tools/nix/utils/async-exec.js';
 import type { ProactiveAction, ActionContext, FileScanResult } from '../../types/proactive-actions.js';
 
 /**
@@ -45,16 +47,21 @@ export class FileScannerAction implements ProactiveAction {
 
       // Use first file entity as pattern
       const pattern = fileEntities[0].value;
-      
-      // Use ripgrep for fast file finding
-      const output = execSync(`rg --files | rg "${pattern}"`, {
-        cwd: projectRoot,
-        encoding: 'utf-8',
-        timeout: Math.min(timeout, 1000), // Max 1s
-        maxBuffer: 1024 * 1024, // 1MB
-      });
 
-      const files = output.split('\n').filter(f => f.length > 0).slice(0, 20);
+      // Use ripgrep for fast file finding (async, non-blocking)
+      const output = await executeRipgrep(
+        ['--files'],
+        {
+          cwd: projectRoot,
+          timeout: Math.min(timeout, 5000),  // Max 5s (async safe)
+        }
+      );
+
+      // Filter for pattern in JavaScript (simple string matching)
+      const allFiles = output.split('\n').filter(f => f.length > 0);
+      const files = allFiles
+        .filter(file => file.includes(pattern))
+        .slice(0, 20);
 
       return {
         action: this.name,
