@@ -24,7 +24,7 @@
 
           # This hash needs to be calculated on first build
           # Run: nix build 2>&1 | grep "got:" to get the correct hash
-          npmDepsHash = "sha256-u0xDEW8vlMcyJtnMEPuVDhJv/piK6lUHKPlkAU5H6+8=";
+          npmDepsHash = "sha256-fYykyRasumSkMXWWkDio25Sd3uoIf6qGuX1+osUo8XU=";
           # Skip Puppeteer Chrome download (must be set before npm install)
           # Using env vars instead of --ignore-scripts to avoid breaking native modules
           makeCacheWritable = true;
