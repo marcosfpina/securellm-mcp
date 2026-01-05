@@ -57,6 +57,16 @@ export interface KnowledgeDatabase {
     getRecentKnowledge(session_id?: string, limit?: number): Promise<KnowledgeEntry[]>;
     deleteKnowledgeEntry(id: number): Promise<void>;
     getStats(): Promise<SessionStats>;
+    storeProjectState(state: {
+        root: string;
+        gitBranch?: string;
+        gitDirty: boolean;
+        buildSuccess: boolean;
+        recentFiles: string[];
+        fileTypes: Record<string, number>;
+        timestamp?: number;
+    }): void;
+    getRecentProjectStates(limit?: number): any[];
     cleanupOldSessions(days: number): Promise<number>;
     close(): void;
 }

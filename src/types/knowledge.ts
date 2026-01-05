@@ -71,6 +71,19 @@ export interface KnowledgeDatabase {
   
   // Stats
   getStats(): Promise<SessionStats>;
+
+  // Context Inference (Project State)
+  storeProjectState(state: {
+    root: string;
+    gitBranch?: string;
+    gitDirty: boolean;
+    buildSuccess: boolean;
+    recentFiles: string[];
+    fileTypes: Record<string, number>;
+    timestamp?: number;
+  }): void;
+  
+  getRecentProjectStates(limit?: number): any[];
   
   // Cleanup
   cleanupOldSessions(days: number): Promise<number>;

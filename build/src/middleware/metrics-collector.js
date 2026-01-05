@@ -136,6 +136,32 @@ export class MetricsCollector {
         };
     }
     /**
+     * Get metrics in Prometheus format
+     */
+    getPrometheusMetrics() {
+        const m = this.getMetrics();
+        const prefix = 'securellm_mcp';
+        return [
+            `# HELP ${prefix}_requests_total Total number of requests`,
+            `# TYPE ${prefix}_requests_total counter`,
+            `${prefix}_requests_total ${m.totalRequests}`,
+            `# HELP ${prefix}_requests_failed_total Total number of failed requests`,
+            `# TYPE ${prefix}_requests_failed_total counter`,
+            `${prefix}_requests_failed_total ${m.failedRequests}`,
+            `# HELP ${prefix}_latency_seconds Request latency in seconds`,
+            `# TYPE ${prefix}_latency_seconds gauge`,
+            `${prefix}_latency_seconds{quantile="0.5"} ${(m.latencyPercentiles.p50 / 1000).toFixed(4)}`,
+            `${prefix}_latency_seconds{quantile="0.95"} ${(m.latencyPercentiles.p95 / 1000).toFixed(4)}`,
+            `${prefix}_latency_seconds{quantile="0.99"} ${(m.latencyPercentiles.p99 / 1000).toFixed(4)}`,
+            `# HELP ${prefix}_circuit_breaker_trips_total Total circuit breaker activations`,
+            `# TYPE ${prefix}_circuit_breaker_trips_total counter`,
+            `${prefix}_circuit_breaker_trips_total ${m.circuitBreakerActivations}`,
+            `# HELP ${prefix}_active_queue_length Current queue length`,
+            `# TYPE ${prefix}_active_queue_length gauge`,
+            `${prefix}_active_queue_length ${m.queueMetrics.averageQueueLength.toFixed(2)}`,
+        ].join('\n');
+    }
+    /**
      * Reset all metrics
      */
     reset() {

@@ -1,10 +1,25 @@
 import Database from 'better-sqlite3';
+import { LRUCache } from 'lru-cache';
 export class VectorStore {
     db;
     llamaCppServer;
+    // Caches for performance
+    embeddingCache;
+    summaryCache;
     constructor(dbPath, llamaCppServer = 'http://localhost:8080') {
         this.db = new Database(dbPath);
         this.llamaCppServer = llamaCppServer;
+        // Initialize caches
+        this.embeddingCache = new LRUCache({
+            max: 1000, // Store up to 1000 embeddings in memory
+            ttl: 1000 * 60 * 60 * 24, // 24 hours TTL
+            sizeCalculation: (val) => val.byteLength, // Track memory usage roughly
+            maxSize: 50 * 1024 * 1024, // Max 50MB for cache
+        });
+        this.summaryCache = new LRUCache({
+            max: 500,
+            ttl: 1000 * 60 * 60 * 24,
+        });
         this.initialize();
     }
     /**
@@ -35,6 +50,12 @@ export class VectorStore {
      * Generate embedding using llama.cpp locally (FREE)
      */
     async generateEmbedding(text) {
+        // Check cache first
+        const cacheKey = `emb:${text.length}:${text.substring(0, 50)}`; // Simple hash key
+        const cached = this.embeddingCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
         try {
             const response = await fetch(`${this.llamaCppServer}/embedding`, {
                 method: 'POST',
@@ -45,7 +66,10 @@ export class VectorStore {
                 throw new Error(`llama.cpp embedding failed: ${response.statusText}`);
             }
             const data = await response.json();
-            return new Float32Array(data.embedding);
+            const embedding = new Float32Array(data.embedding);
+            // Store in cache
+            this.embeddingCache.set(cacheKey, embedding);
+            return embedding;
         }
         catch (error) {
             console.error('[VectorStore] Local embedding failed:', error);
@@ -76,6 +100,12 @@ export class VectorStore {
         if (content.length < 500) {
             return content;
         }
+        // Check cache
+        const cacheKey = `sum:${maxTokens}:${content.length}:${content.substring(0, 50)}`;
+        const cached = this.summaryCache.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
         try {
             const response = await fetch(`${this.llamaCppServer}/completion`, {
                 method: 'POST',
@@ -91,7 +121,10 @@ export class VectorStore {
                 throw new Error(`llama.cpp summarization failed: ${response.statusText}`);
             }
             const data = await response.json();
-            return data.content.trim();
+            const summary = data.content.trim();
+            // Store in cache
+            this.summaryCache.set(cacheKey, summary);
+            return summary;
         }
         catch (error) {
             console.error('[VectorStore] Local summarization failed:', error);

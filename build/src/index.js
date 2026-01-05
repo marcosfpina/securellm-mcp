@@ -17,10 +17,13 @@ import { PackageConfigureTool } from "./tools/package-configure.js";
 import { detectProjectRoot } from "./utils/project-detection.js";
 import { detectNixOSHost } from "./utils/host-detection.js";
 import { logger, logStartupError } from "./utils/logger.js";
+import { ProjectWatcher } from "./system/watcher.js";
 import { emergencyTools, handleEmergencyStatus, handleEmergencyAbort, handleEmergencyCooldown, handleEmergencyNuke, handleEmergencySwap, handleSystemHealthCheck, handleSafeRebuildCheck, } from "./tools/emergency/index.js";
 import { laptopDefenseTools, handleThermalCheck, handleRebuildSafetyCheck, handleThermalForensics, handleThermalWarroom, handleLaptopVerdict, handleFullInvestigation, handleForceCooldown, handleResetPerformance, } from "./tools/laptop-defense/index.js";
 import { webSearchTools, handleWebSearch, handleNixSearch, handleGithubSearch, handleTechNewsSearch, handleDiscourseSearch, handleStackOverflowSearch, } from "./tools/web-search.js";
 import { researchAgentTool, handleResearchAgent, } from "./tools/research-agent.js";
+import { analyzeComplexity, findDeadCode, analyzeComplexitySchema, findDeadCodeSchema, } from "./tools/codebase-analysis.js";
+import { executeInSandboxTool, handleExecuteInSandbox, } from "./tools/secure-execution.js";
 const execAsync = promisify(exec);
 // Legacy constants for backward compatibility - will be overridden by auto-detection
 const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
@@ -44,6 +47,7 @@ class SecureLLMBridgeMCPServer {
     db = null;
     guideManager;
     rateLimiter;
+    projectWatcher = null;
     packageDiagnose;
     packageDownload;
     packageConfigure;
@@ -137,6 +141,12 @@ class SecureLLMBridgeMCPServer {
         try {
             this.db = createKnowledgeDatabase(KNOWLEDGE_DB_PATH);
             logger.info({ dbPath: KNOWLEDGE_DB_PATH }, "Knowledge database initialized");
+            // Initialize Project Watcher if we have a project root
+            if (this.projectRoot) {
+                this.projectWatcher = new ProjectWatcher(this.projectRoot);
+                this.projectWatcher.setDatabase(this.db);
+                this.projectWatcher.start();
+            }
         }
         catch (error) {
             logger.error({ err: error, dbPath: KNOWLEDGE_DB_PATH }, "Failed to initialize knowledge database");
@@ -397,6 +407,21 @@ class SecureLLMBridgeMCPServer {
                 ...webSearchTools,
                 // Add Research Agent tool
                 researchAgentTool,
+                // Add Codebase Analysis Tools
+                {
+                    name: "analyze_complexity",
+                    description: "Analyze code complexity and file size statistics",
+                    defer_loading: true,
+                    inputSchema: analyzeComplexitySchema,
+                },
+                {
+                    name: "find_dead_code",
+                    description: "Heuristic search for unused exports (potentially dead code)",
+                    defer_loading: true,
+                    inputSchema: findDeadCodeSchema,
+                },
+                // Add Secure Execution Tool
+                executeInSandboxTool,
             ],
         }));
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -483,6 +508,14 @@ class SecureLLMBridgeMCPServer {
                     // Research Agent handler
                     case "research_agent":
                         return await handleResearchAgent(args);
+                    // Codebase Analysis handlers
+                    case "analyze_complexity":
+                        return await analyzeComplexity(args);
+                    case "find_dead_code":
+                        return await findDeadCode(args);
+                    // Secure Execution handler
+                    case "execute_in_sandbox":
+                        return await handleExecuteInSandbox(args);
                     default:
                         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
                 }
@@ -514,6 +547,12 @@ class SecureLLMBridgeMCPServer {
                     name: "Usage Metrics",
                     description: "Provider usage statistics",
                     mimeType: "application/json",
+                },
+                {
+                    uri: "metrics://prometheus",
+                    name: "Prometheus Metrics",
+                    description: "System metrics in Prometheus text format",
+                    mimeType: "text/plain",
                 },
                 {
                     uri: "docs://api",
@@ -568,6 +607,16 @@ class SecureLLMBridgeMCPServer {
                         return await this.readAuditLogs();
                     case "metrics://usage":
                         return await this.readUsageMetrics();
+                    case "metrics://prometheus":
+                        return {
+                            contents: [
+                                {
+                                    uri: "metrics://prometheus",
+                                    mimeType: "text/plain",
+                                    text: this.rateLimiter.getAggregatePrometheusMetrics(),
+                                },
+                            ],
+                        };
                     case "docs://api":
                         return await this.readApiDocs();
                     default:
@@ -1650,6 +1699,28 @@ Generate server and client TLS certificates for secure communication.
     }
     async run() {
         const transport = new StdioServerTransport();
+        // Start optional Prometheus metrics HTTP server
+        const metricsPort = process.env.METRICS_PORT;
+        if (metricsPort) {
+            try {
+                const http = await import('http');
+                http.createServer((req, res) => {
+                    if (req.url === '/metrics') {
+                        res.writeHead(200, { 'Content-Type': 'text/plain' });
+                        res.end(this.rateLimiter.getAggregatePrometheusMetrics());
+                    }
+                    else {
+                        res.writeHead(404);
+                        res.end();
+                    }
+                }).listen(parseInt(metricsPort, 10), '127.0.0.1', () => {
+                    logger.info({ port: metricsPort }, "Prometheus metrics server running");
+                });
+            }
+            catch (err) {
+                logger.error({ err }, "Failed to start metrics server");
+            }
+        }
         await this.server.connect(transport);
         logger.info({ transport: "stdio" }, "SecureLLM Bridge MCP server running");
     }

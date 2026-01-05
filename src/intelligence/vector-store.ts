@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import { LRUCache } from 'lru-cache';
 
 /**
  * Vector Store with Intelligent Summarization
@@ -14,6 +15,9 @@ import { execSync } from 'child_process';
  * - Embeddings locally = FREE
  * - Summarization locally = FREE  
  * - Only send relevant summarized context to API = 80% token savings
+ * 
+ * Optimization:
+ * - LRU Caching for Embeddings and Summaries (Memory speed)
  */
 
 interface VectorDocument {
@@ -34,9 +38,27 @@ export class VectorStore {
   private db: Database.Database;
   private llamaCppServer: string;
   
+  // Caches for performance
+  private embeddingCache: LRUCache<string, Float32Array>;
+  private summaryCache: LRUCache<string, string>;
+  
   constructor(dbPath: string, llamaCppServer: string = 'http://localhost:8080') {
     this.db = new Database(dbPath);
     this.llamaCppServer = llamaCppServer;
+    
+    // Initialize caches
+    this.embeddingCache = new LRUCache({
+      max: 1000, // Store up to 1000 embeddings in memory
+      ttl: 1000 * 60 * 60 * 24, // 24 hours TTL
+      sizeCalculation: (val) => val.byteLength, // Track memory usage roughly
+      maxSize: 50 * 1024 * 1024, // Max 50MB for cache
+    });
+
+    this.summaryCache = new LRUCache({
+      max: 500,
+      ttl: 1000 * 60 * 60 * 24,
+    });
+
     this.initialize();
   }
 
@@ -69,6 +91,13 @@ export class VectorStore {
    * Generate embedding using llama.cpp locally (FREE)
    */
   private async generateEmbedding(text: string): Promise<Float32Array> {
+    // Check cache first
+    const cacheKey = `emb:${text.length}:${text.substring(0, 50)}`; // Simple hash key
+    const cached = this.embeddingCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const response = await fetch(`${this.llamaCppServer}/embedding`, {
         method: 'POST',
@@ -81,7 +110,12 @@ export class VectorStore {
       }
 
       const data = await response.json();
-      return new Float32Array(data.embedding);
+      const embedding = new Float32Array(data.embedding);
+      
+      // Store in cache
+      this.embeddingCache.set(cacheKey, embedding);
+      
+      return embedding;
     } catch (error) {
       console.error('[VectorStore] Local embedding failed:', error);
       // Fallback: use simple hash-based embedding
@@ -114,6 +148,13 @@ export class VectorStore {
       return content;
     }
 
+    // Check cache
+    const cacheKey = `sum:${maxTokens}:${content.length}:${content.substring(0, 50)}`;
+    const cached = this.summaryCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const response = await fetch(`${this.llamaCppServer}/completion`, {
         method: 'POST',
@@ -131,7 +172,12 @@ export class VectorStore {
       }
 
       const data = await response.json();
-      return data.content.trim();
+      const summary = data.content.trim();
+      
+      // Store in cache
+      this.summaryCache.set(cacheKey, summary);
+      
+      return summary;
     } catch (error) {
       console.error('[VectorStore] Local summarization failed:', error);
       // Fallback: simple truncation

@@ -279,6 +279,35 @@ export class SmartRateLimiter {
         return allMetrics;
     }
     /**
+     * Get aggregated metrics for all providers in Prometheus format
+     */
+    getAggregatePrometheusMetrics() {
+        const lines = [];
+        const prefix = 'securellm_mcp';
+        // Header
+        lines.push(`# HELP ${prefix}_requests_total Total number of requests by provider`);
+        lines.push(`# TYPE ${prefix}_requests_total counter`);
+        lines.push(`# HELP ${prefix}_latency_seconds Request latency in seconds`);
+        lines.push(`# TYPE ${prefix}_latency_seconds gauge`);
+        lines.push(`# HELP ${prefix}_circuit_breaker_trips_total Total circuit breaker activations`);
+        lines.push(`# TYPE ${prefix}_circuit_breaker_trips_total counter`);
+        for (const [provider, collector] of this.metricsCollectors.entries()) {
+            const m = collector.getMetrics();
+            // Requests
+            lines.push(`${prefix}_requests_total{provider="${provider}",status="success"} ${m.successfulRequests}`);
+            lines.push(`${prefix}_requests_total{provider="${provider}",status="failed"} ${m.failedRequests}`);
+            // Latency
+            lines.push(`${prefix}_latency_seconds{provider="${provider}",quantile="0.5"} ${(m.latencyPercentiles.p50 / 1000).toFixed(4)}`);
+            lines.push(`${prefix}_latency_seconds{provider="${provider}",quantile="0.95"} ${(m.latencyPercentiles.p95 / 1000).toFixed(4)}`);
+            lines.push(`${prefix}_latency_seconds{provider="${provider}",quantile="0.99"} ${(m.latencyPercentiles.p99 / 1000).toFixed(4)}`);
+            // Circuit Breaker
+            lines.push(`${prefix}_circuit_breaker_trips_total{provider="${provider}"} ${m.circuitBreakerActivations}`);
+            // Queue
+            lines.push(`${prefix}_active_queue_length{provider="${provider}"} ${m.queueMetrics.averageQueueLength.toFixed(2)}`);
+        }
+        return lines.join('\n');
+    }
+    /**
      * Get queue status for a provider
      */
     getQueueStatus(provider) {

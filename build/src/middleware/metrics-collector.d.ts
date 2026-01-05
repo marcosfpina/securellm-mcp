@@ -54,6 +54,10 @@ export declare class MetricsCollector {
      */
     getMetrics(): RateLimitMetrics;
     /**
+     * Get metrics in Prometheus format
+     */
+    getPrometheusMetrics(): string;
+    /**
      * Reset all metrics
      */
     reset(): void;

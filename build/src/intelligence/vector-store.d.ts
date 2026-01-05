@@ -10,6 +10,9 @@
  * - Embeddings locally = FREE
  * - Summarization locally = FREE
  * - Only send relevant summarized context to API = 80% token savings
+ *
+ * Optimization:
+ * - LRU Caching for Embeddings and Summaries (Memory speed)
  */
 interface VectorDocument {
     id: string;
@@ -26,6 +29,8 @@ interface SearchResult {
 export declare class VectorStore {
     private db;
     private llamaCppServer;
+    private embeddingCache;
+    private summaryCache;
     constructor(dbPath: string, llamaCppServer?: string);
     /**
      * Initialize vector store schema

@@ -61,6 +61,10 @@ export declare class SmartRateLimiter {
      */
     getAllMetrics(): Map<string, RateLimitMetrics>;
     /**
+     * Get aggregated metrics for all providers in Prometheus format
+     */
+    getAggregatePrometheusMetrics(): string;
+    /**
      * Get queue status for a provider
      */
     getQueueStatus(provider: string): {
