@@ -34,7 +34,17 @@ export class ProjectWatcher extends EventEmitter {
           this.handleFileChange(filename);
         }
       });
-      
+
+      // CRITICAL: Handle FSWatcher errors to prevent server crashes
+      watcher.on('error', (error: Error) => {
+        // Don't crash on permission denied or missing temp files
+        if ('code' in error && (error.code === 'EACCES' || error.code === 'ENOENT' || error.code === 'EPERM')) {
+          logger.debug({ err: error }, "Project watcher: Ignoring filesystem access error");
+        } else {
+          logger.warn({ err: error }, "Project watcher error - continuing operation");
+        }
+      });
+
       this.watchers.push(watcher);
       logger.info({ dir: this.rootDir }, "Project watcher active");
     } catch (error) {
@@ -43,13 +53,46 @@ export class ProjectWatcher extends EventEmitter {
   }
 
   private isIgnored(filename: string): boolean {
-    return filename.includes('node_modules') || 
-           filename.includes('.git') || 
-           filename.includes('build') ||
-           filename.includes('.gemini') ||
-           filename.endsWith('.db') ||
-           filename.endsWith('.db-wal') ||
-           filename.endsWith('.db-shm');
+    // Ignore common development and system directories
+    const ignoredPatterns = [
+      'node_modules',
+      '.git',            // Git directory and all subdirectories
+      '.cache',          // Cache directories
+      '.nix-',           // Nix temp directories
+      'build',
+      'dist',
+      '.gemini',
+      'result',          // Nix build results
+      '.direnv',
+      '__pycache__',
+      '.venv',
+      'venv',
+    ];
+
+    // Check if filename contains any ignored pattern
+    for (const pattern of ignoredPatterns) {
+      if (filename.includes(pattern)) {
+        return true;
+      }
+    }
+
+    // Ignore database files
+    if (filename.endsWith('.db') ||
+        filename.endsWith('.db-wal') ||
+        filename.endsWith('.db-shm') ||
+        filename.endsWith('.sqlite') ||
+        filename.endsWith('.sqlite-wal') ||
+        filename.endsWith('.sqlite-shm')) {
+      return true;
+    }
+
+    // Ignore lock files
+    if (filename.endsWith('.lock') ||
+        filename.endsWith('.lockb')) {
+      return true;
+    }
+
+    return false;
   }
 
   private handleFileChange(filename: string) {

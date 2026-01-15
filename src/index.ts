@@ -288,7 +288,14 @@ class SecureLLMBridgeMCPServer {
       logger.info({ dbPath: KNOWLEDGE_DB_PATH }, "Knowledge database initialized");
 
       // Initialize Project Watcher if we have a project root
-      if (this.projectRoot) {
+      // IMPORTANT: Skip system directories like /etc/nixos - too large and inappropriate for watching
+      const isSystemDir = this.projectRoot.startsWith('/etc') ||
+                          this.projectRoot.startsWith('/usr') ||
+                          this.projectRoot.startsWith('/sys') ||
+                          this.projectRoot.startsWith('/proc') ||
+                          this.projectRoot === '/nix/store';
+
+      if (this.projectRoot && !isSystemDir && process.env.ENABLE_PROJECT_WATCHER !== 'false') {
         this.projectWatcher = new ProjectWatcher(this.projectRoot);
         this.projectWatcher.setDatabase(this.db);
         this.projectWatcher.start();
@@ -297,6 +304,11 @@ class SecureLLMBridgeMCPServer {
         this.contextManager = new ContextManager(this.projectRoot, this.db as any); // Cast to any to avoid type mismatch if different SQLite wrapper
         this.preActionInterceptor = new PreActionInterceptor(this.contextManager);
         logger.info("Proactive Logic Layer initialized");
+      } else if (isSystemDir) {
+        logger.info(
+          { projectRoot: this.projectRoot },
+          "Skipping ProjectWatcher for system directory - use ENABLE_PROJECT_WATCHER=true to override"
+        );
       }
 
     } catch (error) {
