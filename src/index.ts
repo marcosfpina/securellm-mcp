@@ -977,10 +977,8 @@ class SecureLLMBridgeMCPServer {
                 {
                   uri: "metrics://semantic-cache",
                   mimeType: "application/json",
-                  text: JSON.stringify(
-                    this.semanticCache?.getStats() || { error: "Semantic cache not initialized" },
-                    null,
-                    2
+                  text: stringify(
+                    this.semanticCache?.getStats() || { error: "Semantic cache not initialized" }
                   ),
                 },
               ],
@@ -1026,14 +1024,14 @@ class SecureLLMBridgeMCPServer {
         content: [
           {
             type: "text",
-            text: JSON.stringify({
+            text: stringify({
               provider,
               model: model || "default",
               prompt,
               status: "success",
               output: result.stdout,
               stderr: result.stderr || null,
-            }, null, 2),
+            }),
           },
         ],
       };
@@ -1480,7 +1478,7 @@ class SecureLLMBridgeMCPServer {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({ results, count: results.length }, null, 2)
+          text: stringify({ results, count: results.length })
         }]
       };
     } catch (error: any) {
@@ -1512,7 +1510,7 @@ class SecureLLMBridgeMCPServer {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify({ session, entries, count: entries.length }, null, 2)
+          text: stringify({ session, entries, count: entries.length })
         }]
       };
     } catch (error: any) {
