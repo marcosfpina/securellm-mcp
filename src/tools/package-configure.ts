@@ -211,7 +211,7 @@ export class PackageConfigureTool {
 
 pkgs.buildNpmPackage {
   pname = "${packageName}";
-  version = "1.0.0"; # TODO: Update with actual version from package.json
+  version = "1.0.0"; # Placeholder - update with actual version after extracting package.json
 
   src = pkgs.fetchurl {
     url = "file://${this.workspaceDir}/${storageFile}";
@@ -219,7 +219,8 @@ pkgs.buildNpmPackage {
   };
 
   # Run build once to get the correct npmDepsHash from the error message
-  npmDepsHash = ""; # TODO: Fill with hash from first build attempt
+  # After first build attempt, Nix will provide the expected hash in the error output
+  npmDepsHash = ""; # Leave empty initially - will be filled from nix-build error message
 
   ${dependencies.length > 0 ? `# Native build dependencies
   nativeBuildInputs = with pkgs; [

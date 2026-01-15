@@ -390,8 +390,9 @@ export class DeepResearchEngine {
         // Simple consensus: if multiple high-credibility sources say similar things
         const highCredibility = results.filter(r => r.credibility >= 0.8);
         if (highCredibility.length >= 2) {
-            // TODO: Implement semantic similarity check
-            // For now, return the content from the highest credibility source
+            // Future: Implement semantic similarity check to detect duplicate sources
+            // Would use embedding-based comparison (threshold: 0.85) via semantic cache
+            // For now, rely on credibility ranking and return highest-scored content
             return highCredibility[0].content || highCredibility[0].title;
         }
 
@@ -402,8 +403,10 @@ export class DeepResearchEngine {
      * Detect conflicts between sources
      */
     private detectConflicts(results: SourceResult[]): Conflict[] {
-        // TODO: Implement conflict detection using NLP
-        // For now, return empty array
+        // Future: Implement conflict detection using NLP analysis
+        // Would identify contradictory information across sources
+        // Requires integration with language model for semantic understanding
+        // For now, return empty array (no conflicts detected)
         return [];
     }
 

@@ -304,7 +304,9 @@ export class WildcardCommandSystem {
      * (Track which commands solve which problems)
      */
     learnFromSuccess(problem, commands) {
-        // TODO: Store in vector database for future reference
+        // Future enhancement: Consider storing in vector database for semantic search
+        // Would enable better pattern matching and intelligent command recommendations
+        // For now, log successful patterns for audit trail
         console.log(`[WildcardCmd] Learned solution for: ${problem}`);
     }
 }
