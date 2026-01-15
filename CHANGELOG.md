@@ -6,6 +6,7 @@
 * **build:** resolve TypeScript compilation errors in tests ([babb8b7](https://github.com/marcosfpina/securellm-mcp/commit/babb8b77f64b3ebeab2dba99573207fa80eb9cc9))
 * **deps:** update npm dependencies and fix MCP SDK compatibility ([1b999e6](https://github.com/marcosfpina/securellm-mcp/commit/1b999e66109bd30a55c424080cb9557dd2ea61a7))
 * **flake.nix:** update npm dependencies hash ([863538f](https://github.com/marcosfpina/securellm-mcp/commit/863538f5d25612153036c69b4a23b803e4ffbc02))
+* **mcp:** improve ProjectWatcher stability and semantic cache ([8611a40](https://github.com/marcosfpina/securellm-mcp/commit/8611a40d785ed30d4a8d05ab7d097cb2fb7d7819))
 * **naming:** standardize server name to securellm-mcp ([0edd096](https://github.com/marcosfpina/securellm-mcp/commit/0edd096ad26549f478e1787ecfbdfaa92b18be33))
 * **nix:** update npmDepsHash to match actual dependencies ([eae9599](https://github.com/marcosfpina/securellm-mcp/commit/eae959982ba86a3641203ea4b1ea3556bf14ad66))
 * regenerate package-lock.json to match package.json dependencies ([20a955a](https://github.com/marcosfpina/securellm-mcp/commit/20a955af33f66c1a211fa3c281b72a49f3a6b953))
