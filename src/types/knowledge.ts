@@ -88,6 +88,12 @@ export interface KnowledgeDatabase {
   // Cleanup
   cleanupOldSessions(days: number): Promise<number>;
   
+  // Maintenance
+  maintenance(): Promise<void>;
+
+  // Patterns
+  getPatterns(type?: string, limit?: number): any[];
+  
   // Close
   close(): void;
 }

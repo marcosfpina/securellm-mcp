@@ -13,3 +13,5 @@ export { MultiStepPlanner } from './multi-step-planner.js';
 export { PlanGenerator } from './planning/plan-generator.js';
 export { PlanExecutor } from './planning/plan-executor.js';
 export { DependencyResolver } from './planning/dependency-resolver.js';
+export { PreActionInterceptor } from './proactive/pre-action-interceptor.js';
+export { ContextEnricher } from './proactive/context-enricher.js';

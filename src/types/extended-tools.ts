@@ -55,6 +55,8 @@ export interface SSHConnectArgs {
   certificate_path?: string;
 }
 
+export type SSHConfig = SSHConnectArgs;
+
 export interface SSHExecuteArgs {
   connection_id: string;
   command: string;

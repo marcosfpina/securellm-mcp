@@ -137,21 +137,21 @@ export const knowledgeTools: ExtendedTool[] = [
   },
   {
     name: "get_recent_knowledge",
-    description: "Get the most recent knowledge entries, optionally filtered by session.",
-    defer_loading: true,
-    allowed_callers: ["code_execution_20250825"],
+    description: "Get recently saved knowledge entries",
     inputSchema: {
       type: "object",
       properties: {
-        session_id: {
-          type: "string",
-          description: "Optional: filter by session ID",
-        },
-        limit: {
-          type: "number",
-          description: "Number of entries to return (default: 20)",
-        },
-      },
-    },
+        session_id: { type: "string" },
+        limit: { type: "number", default: 20 }
+      }
+    }
   },
+  {
+    name: "knowledge_maintenance",
+    description: "Run maintenance tasks on knowledge database (VACUUM, ANALYZE)",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  }
 ];

@@ -3,6 +3,7 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 import type { KnowledgeDatabase } from '../types/knowledge.js';
+import { KnowledgeChunker } from '../utils/chunker.js';
 
 /**
  * Project Watcher
@@ -45,7 +46,10 @@ export class ProjectWatcher extends EventEmitter {
     return filename.includes('node_modules') || 
            filename.includes('.git') || 
            filename.includes('build') ||
-           filename.includes('.gemini');
+           filename.includes('.gemini') ||
+           filename.endsWith('.db') ||
+           filename.endsWith('.db-wal') ||
+           filename.endsWith('.db-shm');
   }
 
   private handleFileChange(filename: string) {
@@ -70,19 +74,66 @@ export class ProjectWatcher extends EventEmitter {
     // Update Knowledge Graph (Persistent State)
     if (this.db) {
       try {
-        // We store this as a "Project State Snapshot"
-        // This allows the LLM to query: "What files did I just touch?"
+        // 1. Store Project State Snapshot
         this.db.storeProjectState({
           root: this.rootDir,
           gitDirty: true,
-          buildSuccess: false, // Assume dirty state invalidates build until proven otherwise
-          recentFiles: files.slice(0, 10), // Store top 10 recent files
+          buildSuccess: false,
+          recentFiles: files.slice(0, 10),
           fileTypes: this.countFileTypes(files),
           timestamp: Date.now()
         });
+
+        // 2. Extract and Chunk Content from important files
+        for (const file of files) {
+          await this.processFileKnowledge(file);
+        }
+
       } catch (err) {
         logger.error({ err }, "Failed to update knowledge DB with file changes");
       }
+    }
+  }
+
+  /**
+   * Extract knowledge from a single file
+   */
+  private async processFileKnowledge(filename: string) {
+    const filePath = path.resolve(this.rootDir, filename);
+    
+    // Only process readable text files of reasonable size
+    const ext = path.extname(filename);
+    const supportedExts = ['.ts', '.js', '.nix', '.md', '.toml', '.json'];
+    
+    if (!supportedExts.includes(ext)) return;
+
+    try {
+      if (!fs.existsSync(filePath)) return;
+      const stats = fs.statSync(filePath);
+      if (stats.size > 1024 * 100) return; // Limit to 100KB for now
+
+      const content = fs.readFileSync(filePath, 'utf-8');
+      
+      // Chunk the content
+      const chunks = KnowledgeChunker.splitByCode(content);
+      
+      // Store chunks in DB
+      for (const chunk of chunks) {
+        await this.db!.saveKnowledge({
+          type: 'code',
+          content: chunk.content,
+          priority: 'medium',
+          tags: ['auto-extract', ext.substring(1), filename],
+          metadata: {
+            file: filename,
+            ...chunk.metadata
+          }
+        });
+      }
+
+      logger.debug({ file: filename, chunks: chunks.length }, "Knowledge extracted from file");
+    } catch (err) {
+      logger.error({ err, file: filename }, "Failed to process file knowledge");
     }
   }
 

@@ -6,17 +6,33 @@
 // @ts-ignore
 import { Client } from 'ssh2';
 import { SSHConnectionManager } from './connection-manager.js';
+import { SSHTunnelManager } from './tunnel-manager.js';
+import { SSHJumpHostManager } from './jump-host-manager.js';
+import { SSHSessionManager } from './session-manager.js';
 import type {
   SSHExecuteArgs,
   SSHFileTransferArgs,
   SSHMaintenanceCheckArgs,
   ToolResult,
 } from '../../types/extended-tools.js';
+import path from 'path';
 
 export { SSHConnectionManager, sshConnectSchema } from './connection-manager.js';
 
 // Global connection manager instance
+// In a real app, these would be initialized with config
 const connectionManager = new SSHConnectionManager();
+const tunnelManager = new SSHTunnelManager(connectionManager);
+const jumpHostManager = new SSHJumpHostManager(connectionManager);
+
+// We need a path for the SQLite DB. Using default location for now.
+const DB_PATH = process.env.SSH_SESSION_DB_PATH || path.join(process.cwd(), 'ssh_sessions.db');
+const sessionManager = new SSHSessionManager(
+  DB_PATH,
+  connectionManager,
+  tunnelManager,
+  jumpHostManager
+);
 
 /**
  * SSH Execute Tool
@@ -245,6 +261,89 @@ export class SSHMaintenanceCheckTool {
   }
 }
 
+/**
+ * SSH Tunnel Tool
+ */
+export class SSHTunnelTool {
+  async execute(args: any): Promise<ToolResult> {
+    try {
+      const result = await tunnelManager.createTunnel(args);
+      return {
+        success: true,
+        data: result.data,
+        timestamp: result.timestamp
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+}
+
+/**
+ * SSH Jump Host Tool
+ */
+export class SSHJumpHostTool {
+  async execute(args: any): Promise<ToolResult> {
+    try {
+      const result = await jumpHostManager.connectThroughJumps(args);
+      return {
+        success: result.success,
+        data: result.data,
+        error: result.error,
+        timestamp: result.timestamp
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+}
+
+/**
+ * SSH Session Tool
+ */
+export class SSHSessionTool {
+  async execute(args: any): Promise<ToolResult> {
+    try {
+      if (args.action === 'save') {
+        const result = await sessionManager.persistSession(args);
+        return {
+          success: true,
+          data: result,
+          timestamp: new Date().toISOString()
+        };
+      } else if (args.action === 'restore') {
+        const result = await sessionManager.restoreSession(args.session_id);
+        return {
+          success: result.success,
+          data: result.data,
+          error: result.error,
+          timestamp: result.timestamp
+        };
+      } else {
+        return {
+          success: false,
+          error: `Unknown action: ${args.action}`,
+          timestamp: new Date().toISOString()
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+}
+
 // Export schemas
 export const sshExecuteSchema = {
   name: "ssh_execute",
@@ -292,3 +391,64 @@ export const sshMaintenanceCheckSchema = {
     required: ["connection_id", "checks"],
   },
 };
+
+export const sshTunnelSchema = {
+  name: "ssh_tunnel",
+  description: "Create SSH tunnel (Local, Remote, or Dynamic)",
+  inputSchema: {
+    type: "object",
+    properties: {
+      type: { type: "string", enum: ["local", "remote", "dynamic"] },
+      connection_id: { type: "string" },
+      local_port: { type: "number" },
+      remote_host: { type: "string" },
+      remote_port: { type: "number" },
+      socks_port: { type: "number" },
+      bind_address: { type: "string" },
+      keep_alive: { type: "boolean" },
+      auto_restart: { type: "boolean" }
+    },
+    required: ["type", "connection_id"]
+  }
+};
+
+export const sshJumpHostSchema = {
+  name: "ssh_jump_host",
+  description: "Connect via Jump Host(s)",
+  inputSchema: {
+    type: "object",
+    properties: {
+      target: { type: "object" }, // Full schema in types
+      jumps: { type: "array", items: { type: "object" } },
+      strategy: { type: "string", enum: ["sequential", "optimal"] },
+      cache_successful_path: { type: "boolean" }
+    },
+    required: ["target", "jumps"]
+  }
+};
+
+export const sshSessionSchema = {
+  name: "ssh_session_manager",
+  description: "Manage persistent SSH sessions",
+  inputSchema: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["save", "restore"] },
+      connection_id: { type: "string" }, // for save
+      session_id: { type: "string" }, // for restore
+      persist: { type: "boolean" },
+      auto_recover: { type: "boolean" }
+    },
+    required: ["action"]
+  }
+};
+
+// Export tool instances
+export const sshTools = [
+  new SSHExecuteTool(),
+  new SSHFileTransferTool(),
+  new SSHMaintenanceCheckTool(),
+  new SSHTunnelTool(),
+  new SSHJumpHostTool(),
+  new SSHSessionTool()
+];
