@@ -24,15 +24,15 @@
 
           # This hash needs to be calculated on first build
           # Run: nix build 2>&1 | grep "got:" to get the correct hash
-          npmDepsHash = "sha256-3Pxwb+XTanQKzR31LB+ZmFz37EPJDpJQlrqTCzfeSN8=";
+          npmDepsHash = pkgs.lib.fakeHash;
           # Skip Puppeteer Chrome download (must be set before npm install)
           # Using env vars instead of --ignore-scripts to avoid breaking native modules
           makeCacheWritable = true;
-          
+
           # Set in all phases to ensure puppeteer skips download
           PUPPETEER_SKIP_DOWNLOAD = "true";
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true";
-          
+
           # Also set in preConfigure for the npm deps phase
           preConfigure = ''
             export PUPPETEER_SKIP_DOWNLOAD=true
@@ -41,7 +41,7 @@
 
           nativeBuildInputs = with pkgs; [
             nodejs
-            python3 # Needed for better-sqlite3 native compilation
+            python313 # Needed for better-sqlite3 native compilation
             pkg-config
           ];
 
@@ -149,12 +149,12 @@ EOF
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Node.js development (Node 22.6+ has built-in TypeScript support)
-            nodejs
+            nodejs_24
             nodePackages.typescript
             nodePackages.npm
 
             # Build dependencies
-            python3
+            python313
             pkg-config
             sqlite
 
