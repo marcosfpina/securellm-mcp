@@ -27,26 +27,3 @@
 
 
 
-### Documentation
-- Comprehensive README with architecture diagrams
-- API documentation for all MCP resources
-- Integration guides for Claude Desktop and Cline
-- Usage examples for all major features
-- Architecture documentation in docs/ directory
-
-## [1.0.0] - 2024-11-01
-
-### Added
-- Initial MCP server implementation
-- Basic tool registration system
-- Configuration management
-- Project root detection
-- NixOS host detection
-- Basic logging infrastructure
-
-### Documentation
-- Initial README
-- Basic usage instructions
-
-[2.0.0]: https://github.com/marcosfpina/securellm-mcp/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/marcosfpina/securellm-mcp/releases/tag/v1.0.0
