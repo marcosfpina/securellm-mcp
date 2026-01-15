@@ -11,6 +11,7 @@ import type { FlakeBuildResult, FlakeMetadata } from '../../types/nix-tools.js';
  */
 export declare class FlakeOps {
     private projectRoot;
+    private metadataCache;
     constructor(projectRoot: string);
     /**
      * Build a flake output
@@ -24,10 +25,18 @@ export declare class FlakeOps {
      * Update flake inputs
      */
     update(input?: string): Promise<FlakeBuildResult>;
-    /**
-     * Show flake metadata
-     */
     show(): Promise<FlakeMetadata>;
+    /**
+     * Get cache statistics
+     */
+    getCacheStats(): {
+        metadata: {
+            size: number;
+            hits: number;
+            misses: number;
+            hitRate: number;
+        };
+    };
     /**
      * Evaluate Nix expression
      */

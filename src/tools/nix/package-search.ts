@@ -6,15 +6,24 @@
 
 import { executeNixCommand } from './utils/async-exec.js';
 import type { NixPackage } from '../../types/nix-tools.js';
+import { CacheManager } from '../../utils/cache-manager.js';
 
 /**
  * Package Search
  */
 export class PackageSearch {
+  private searchCache = new CacheManager<string, NixPackage[]>({
+    max: 500,
+    ttl: 1800000,  // 30 min
+  });
   /**
    * Search for packages
    */
   public async search(query: string, limit: number = 20): Promise<NixPackage[]> {
+    const cacheKey = `search:${query}:${limit}`;
+    const cached = this.searchCache.get(cacheKey);
+    if (cached) return cached;
+
     try {
       // Use nix search for fast searching
       const output = await executeNixCommand(['search', 'nixpkgs', query, '--json'], {
@@ -38,11 +47,16 @@ export class PackageSearch {
         if (packages.length >= limit) break;
       }
 
+      this.searchCache.set(cacheKey, packages);
       return packages;
     } catch (error: any) {
       // Fallback to simpler search if JSON fails
       return this.fallbackSearch(query, limit);
     }
+  }
+
+  public getCacheStats() {
+    return this.searchCache.getStats();
   }
 
   /**

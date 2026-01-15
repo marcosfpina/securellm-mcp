@@ -20,7 +20,7 @@ import { logger, logStartupError } from "./utils/logger.js";
 import { ProjectWatcher } from "./system/watcher.js";
 import { emergencyTools, handleEmergencyStatus, handleEmergencyAbort, handleEmergencyCooldown, handleEmergencyNuke, handleEmergencySwap, handleSystemHealthCheck, handleSafeRebuildCheck, } from "./tools/emergency/index.js";
 import { laptopDefenseTools, handleThermalCheck, handleRebuildSafetyCheck, handleThermalForensics, handleThermalWarroom, handleLaptopVerdict, handleFullInvestigation, handleForceCooldown, handleResetPerformance, } from "./tools/laptop-defense/index.js";
-import { webSearchTools, handleWebSearch, handleNixSearch, handleGithubSearch, handleTechNewsSearch, handleDiscourseSearch, handleStackOverflowSearch, } from "./tools/web-search.js";
+import { webSearchTools, handleWebSearch, handleNixSearch, handleGithubSearch, handleTechNewsSearch, handleDiscourseSearch, handleStackOverflowSearch, getNixCacheStats, } from "./tools/web-search.js";
 import { researchAgentTool, handleResearchAgent, } from "./tools/research-agent.js";
 import { analyzeComplexity, findDeadCode, analyzeComplexitySchema, findDeadCodeSchema, } from "./tools/codebase-analysis.js";
 import { sshExecuteSchema, sshFileTransferSchema, sshMaintenanceCheckSchema, sshTunnelSchema, sshJumpHostSchema, sshSessionSchema, SSHExecuteTool, SSHFileTransferTool, SSHMaintenanceCheckTool, SSHTunnelTool, SSHJumpHostTool, SSHSessionTool, } from "./tools/ssh/index.js";
@@ -28,6 +28,14 @@ import { executeInSandboxTool, handleExecuteInSandbox, } from "./tools/secure-ex
 import { SemanticCache } from "./middleware/semantic-cache.js";
 import { ContextManager } from "./reasoning/context-manager.js";
 import { PreActionInterceptor } from "./reasoning/proactive/pre-action-interceptor.js";
+import { stringifyGeneric, } from './utils/json-schemas.js';
+const shouldPrettyPrint = process.env.NODE_ENV === 'development';
+function stringify(obj) {
+    if (shouldPrettyPrint) {
+        return JSON.stringify(obj, null, 2);
+    }
+    return stringifyGeneric(obj);
+}
 const execAsync = promisify(exec);
 // Legacy constants for backward compatibility - will be overridden by auto-detection
 const PROJECT_ROOT = process.env.PROJECT_ROOT || process.cwd();
@@ -319,6 +327,15 @@ class SecureLLMBridgeMCPServer {
                     },
                 },
                 {
+                    name: "cache_stats",
+                    description: "Get cache statistics (Semantic Cache, Nix Package Cache)",
+                    defer_loading: true,
+                    inputSchema: {
+                        type: "object",
+                        properties: {},
+                    },
+                },
+                {
                     name: "package_diagnose",
                     description: "Diagnose package configuration issues",
                     defer_loading: true,
@@ -551,6 +568,19 @@ class SecureLLMBridgeMCPServer {
                         break;
                     case "rate_limiter_status":
                         result = await this.handleRateLimiterStatus();
+                        break;
+                    case "cache_stats":
+                        result = {
+                            content: [
+                                {
+                                    type: "text",
+                                    text: stringify({
+                                        semantic_cache: this.semanticCache?.getStats() || null,
+                                        nix_cache: getNixCacheStats(),
+                                    }),
+                                },
+                            ],
+                        };
                         break;
                     case "package_diagnose":
                         result = await this.handlePackageDiagnose(args);
@@ -806,7 +836,7 @@ class SecureLLMBridgeMCPServer {
                                 {
                                     uri: "metrics://semantic-cache",
                                     mimeType: "application/json",
-                                    text: JSON.stringify(this.semanticCache?.getStats() || { error: "Semantic cache not initialized" }, null, 2),
+                                    text: stringify(this.semanticCache?.getStats() || { error: "Semantic cache not initialized" }),
                                 },
                             ],
                         };
@@ -842,14 +872,14 @@ class SecureLLMBridgeMCPServer {
                 content: [
                     {
                         type: "text",
-                        text: JSON.stringify({
+                        text: stringify({
                             provider,
                             model: model || "default",
                             prompt,
                             status: "success",
                             output: result.stdout,
                             stderr: result.stderr || null,
-                        }, null, 2),
+                        }),
                     },
                 ],
             };
@@ -1258,7 +1288,7 @@ class SecureLLMBridgeMCPServer {
             return {
                 content: [{
                         type: "text",
-                        text: JSON.stringify({ results, count: results.length }, null, 2)
+                        text: stringify({ results, count: results.length })
                     }]
             };
         }
@@ -1288,7 +1318,7 @@ class SecureLLMBridgeMCPServer {
             return {
                 content: [{
                         type: "text",
-                        text: JSON.stringify({ session, entries, count: entries.length }, null, 2)
+                        text: stringify({ session, entries, count: entries.length })
                     }]
             };
         }

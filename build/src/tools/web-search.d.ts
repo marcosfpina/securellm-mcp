@@ -8,6 +8,12 @@
  * - Source credibility indicators
  */
 import type { ExtendedTool } from "../types/mcp-tool-extensions.js";
+export declare function getNixCacheStats(): {
+    size: number;
+    hits: number;
+    misses: number;
+    hitRate: number;
+};
 export interface WebSearchArgs {
     query: string;
     search_type?: "general" | "nixos" | "github" | "stackoverflow" | "reddit";

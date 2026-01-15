@@ -4,14 +4,23 @@
  * Search for Nix packages across nixpkgs and other channels.
  */
 import { executeNixCommand } from './utils/async-exec.js';
+import { CacheManager } from '../../utils/cache-manager.js';
 /**
  * Package Search
  */
 export class PackageSearch {
+    searchCache = new CacheManager({
+        max: 500,
+        ttl: 1800000, // 30 min
+    });
     /**
      * Search for packages
      */
     async search(query, limit = 20) {
+        const cacheKey = `search:${query}:${limit}`;
+        const cached = this.searchCache.get(cacheKey);
+        if (cached)
+            return cached;
         try {
             // Use nix search for fast searching
             const output = await executeNixCommand(['search', 'nixpkgs', query, '--json'], {
@@ -31,12 +40,16 @@ export class PackageSearch {
                 if (packages.length >= limit)
                     break;
             }
+            this.searchCache.set(cacheKey, packages);
             return packages;
         }
         catch (error) {
             // Fallback to simpler search if JSON fails
             return this.fallbackSearch(query, limit);
         }
+    }
+    getCacheStats() {
+        return this.searchCache.getStats();
     }
     /**
      * Get package info

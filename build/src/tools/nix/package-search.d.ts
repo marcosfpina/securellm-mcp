@@ -8,10 +8,17 @@ import type { NixPackage } from '../../types/nix-tools.js';
  * Package Search
  */
 export declare class PackageSearch {
+    private searchCache;
     /**
      * Search for packages
      */
     search(query: string, limit?: number): Promise<NixPackage[]>;
+    getCacheStats(): {
+        size: number;
+        hits: number;
+        misses: number;
+        hitRate: number;
+    };
     /**
      * Get package info
      */

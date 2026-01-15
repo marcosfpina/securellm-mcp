@@ -57,6 +57,7 @@ import {
   handleTechNewsSearch,
   handleDiscourseSearch,
   handleStackOverflowSearch,
+  getNixCacheStats,
 } from "./tools/web-search.js";
 import {
   researchAgentTool,
@@ -461,6 +462,15 @@ class SecureLLMBridgeMCPServer {
           },
         },
         {
+          name: "cache_stats",
+          description: "Get cache statistics (Semantic Cache, Nix Package Cache)",
+          defer_loading: true,
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+        {
           name: "package_diagnose",
           description: "Diagnose package configuration issues",
           defer_loading: true,
@@ -701,6 +711,19 @@ class SecureLLMBridgeMCPServer {
             break;
           case "rate_limiter_status":
             result = await this.handleRateLimiterStatus();
+            break;
+          case "cache_stats":
+            result = {
+              content: [
+                {
+                  type: "text",
+                  text: stringify({
+                    semantic_cache: this.semanticCache?.getStats() || null,
+                    nix_cache: getNixCacheStats(),
+                  }),
+                },
+              ],
+            };
             break;
           case "package_diagnose":
             result = await this.handlePackageDiagnose(args);

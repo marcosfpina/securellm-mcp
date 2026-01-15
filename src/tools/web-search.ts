@@ -9,6 +9,13 @@
  */
 
 import type { ExtendedTool } from "../types/mcp-tool-extensions.js";
+import { PackageSearch } from "./nix/package-search.js";
+
+const packageSearch = new PackageSearch();
+
+export function getNixCacheStats() {
+  return packageSearch.getCacheStats();
+}
 
 export interface WebSearchArgs {
   query: string;
@@ -423,26 +430,16 @@ export async function handleNixSearch(args: NixSearchArgs) {
 
     // Try local nix search first
     try {
-      const { exec } = await import("child_process");
-      const { promisify } = await import("util");
-      const execAsync = promisify(exec);
+      const packages = await packageSearch.search(searchTerm, 10);
 
-      const nixChannel = channel === "stable" ? "nixpkgs" : "nixpkgs/nixos-unstable";
-      const { stdout } = await execAsync(
-        `nix search ${nixChannel} ${searchTerm} --json 2>/dev/null | head -c 10000`,
-        { timeout: 15000 }
-      );
-
-      const nixResults = JSON.parse(stdout || "{}");
-
-      const results = Object.entries(nixResults).slice(0, 10).map(([path, info]: [string, any]) => ({
-        name: info.pname || path.split('.').pop(),
-        path,
-        version: info.version,
-        description: info.description,
+      const results = packages.map(pkg => ({
+        name: pkg.name,
+        path: pkg.attrPath,
+        version: pkg.version,
+        description: pkg.description,
         // Actionable info
-        install_cmd: `nix profile install nixpkgs#${info.pname || path.split('.').pop()}`,
-        shell_cmd: `nix shell nixpkgs#${info.pname || path.split('.').pop()}`,
+        install_cmd: `nix profile install nixpkgs#${pkg.attrPath}`,
+        shell_cmd: `nix shell nixpkgs#${pkg.attrPath}`,
       }));
 
       return formatIntelligentOutput({

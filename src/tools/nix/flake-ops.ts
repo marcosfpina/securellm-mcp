@@ -47,12 +47,6 @@ export class FlakeOps {
     return this.executeFlakeCommand('update', '', args);
   }
 
-  /**
-   * Show flake metadata
-   */
-  /**
-   * Show flake metadata
-   */
   public async show(): Promise<FlakeMetadata> {
     const cacheKey = `metadata:${this.projectRoot}`;
 
