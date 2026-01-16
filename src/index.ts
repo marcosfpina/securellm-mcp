@@ -195,17 +195,53 @@ class SecureLLMBridgeMCPServer {
     this.setupResourceHandlers();
 
     this.server.onerror = (error) => logger.error({ err: error }, "MCP server error");
-    process.on("SIGINT", async () => {
-      logger.info("Received SIGINT, shutting down gracefully");
-      if (this.db) {
-        this.db.close();
+
+    // Register shutdown handlers for graceful cleanup
+    const shutdownHandler = async () => {
+      logger.info("Received shutdown signal, cleaning up resources");
+
+      try {
+        // Stop project watcher first to prevent new events
+        if (this.projectWatcher) {
+          this.projectWatcher.stop();
+          this.projectWatcher = null;
+        }
+
+        // Close semantic cache (stops cleanup interval)
+        if (this.semanticCache) {
+          this.semanticCache.close();
+          this.semanticCache = null;
+        }
+
+        // Close knowledge database
+        if (this.db) {
+          this.db.close();
+          this.db = null;
+        }
+
+        // Clear context manager
+        if (this.contextManager) {
+          this.contextManager = null;
+        }
+
+        // Clear pre-action interceptor
+        if (this.preActionInterceptor) {
+          this.preActionInterceptor = null;
+        }
+
+        // Close MCP server
+        await this.server.close();
+
+        logger.info("Shutdown complete");
+      } catch (error) {
+        logger.error({ err: error }, "Error during shutdown");
       }
-      if (this.semanticCache) {
-        this.semanticCache.close();
-      }
-      await this.server.close();
+
       process.exit(0);
-    });
+    };
+
+    process.on("SIGINT", shutdownHandler);
+    process.on("SIGTERM", shutdownHandler);
   }
 
   /**

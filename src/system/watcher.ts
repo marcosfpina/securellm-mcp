@@ -26,6 +26,12 @@ export class ProjectWatcher extends EventEmitter {
   }
 
   public start() {
+    // Prevent multiple watchers from accumulating
+    if (this.watchers.length > 0) {
+      logger.debug("Project watcher already started");
+      return;
+    }
+
     try {
       // In a real enterprise app, we'd use 'chokidar' for robust cross-platform watching.
       // Using native fs.watch for zero-dependency implementation.
@@ -106,9 +112,11 @@ export class ProjectWatcher extends EventEmitter {
   }
 
   private async flushChanges() {
+    // Create snapshot of changed files but don't clear yet
     const files = Array.from(this.changedFiles);
-    this.changedFiles.clear();
-    
+
+    if (files.length === 0) return;
+
     logger.info({ filesCount: files.length }, "Processing file changes");
 
     // Emit event for real-time systems
@@ -132,9 +140,17 @@ export class ProjectWatcher extends EventEmitter {
           await this.processFileKnowledge(file);
         }
 
+        // Only clear after successful processing
+        this.changedFiles.clear();
+
       } catch (err) {
         logger.error({ err }, "Failed to update knowledge DB with file changes");
+        // Keep changedFiles intact for retry on next flush
+        // This prevents data loss when DB operations fail
       }
+    } else {
+      // No DB configured, safe to clear
+      this.changedFiles.clear();
     }
   }
 
@@ -190,7 +206,16 @@ export class ProjectWatcher extends EventEmitter {
   }
 
   public stop() {
+    // Clear pending debounce timer to prevent ghost operations
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+
+    // Close all watchers
     this.watchers.forEach(w => w.close());
     this.watchers = [];
+
+    logger.info("Project watcher stopped");
   }
 }

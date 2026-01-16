@@ -25,10 +25,49 @@ import type {
 } from '../types/semantic-cache.js';
 import { DEFAULT_SEMANTIC_CACHE_CONFIG } from '../types/semantic-cache.js';
 
+/**
+ * Simple mutex implementation to prevent race conditions
+ */
+class Mutex {
+  private locked = false;
+  private queue: Array<() => void> = [];
+
+  async lock(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  unlock(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      next?.();
+    } else {
+      this.locked = false;
+    }
+  }
+
+  async runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    await this.lock();
+    try {
+      return await fn();
+    } finally {
+      this.unlock();
+    }
+  }
+}
+
 export class SemanticCache {
   private db: Database.Database;
   private config: SemanticCacheConfig;
   private stats: SemanticCacheStats;
+  private statsMutex: Mutex = new Mutex();
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(dbPath: string, config: Partial<SemanticCacheConfig> = {}) {
     this.db = new Database(dbPath);
@@ -44,6 +83,7 @@ export class SemanticCache {
     };
 
     this.initialize();
+    this.startAutoCleanup();
 
     logger.info(
       {
@@ -52,6 +92,26 @@ export class SemanticCache {
       },
       'SemanticCache initialized'
     );
+  }
+
+  /**
+   * Start automatic cleanup of expired entries
+   */
+  private startAutoCleanup(): void {
+    // Clean up every 10 minutes
+    this.cleanupInterval = setInterval(() => {
+      try {
+        const deleted = this.cleanExpired();
+        if (deleted > 0) {
+          logger.info({ deleted }, 'Auto-cleaned expired semantic cache entries');
+        }
+      } catch (error) {
+        logger.error({ err: error }, 'Error during auto-cleanup');
+      }
+    }, 10 * 60 * 1000);
+
+    // Prevent interval from keeping process alive
+    this.cleanupInterval.unref();
   }
 
   /**
@@ -208,7 +268,10 @@ export class SemanticCache {
       return null;
     }
 
-    this.stats.totalQueries++;
+    // Protect stats increment with mutex
+    await this.statsMutex.runExclusive(async () => {
+      this.stats.totalQueries++;
+    });
 
     try {
       // Generate embedding for query
@@ -256,7 +319,7 @@ export class SemanticCache {
       // Check if best match exceeds threshold
       if (bestMatch && bestSimilarity >= this.config.similarityThreshold) {
         // Cache HIT!
-        this.recordHit(bestMatch.entry.id, bestSimilarity);
+        await this.recordHit(bestMatch.entry.id, bestSimilarity);
 
         logger.info(
           {
@@ -271,9 +334,11 @@ export class SemanticCache {
         return JSON.parse(bestMatch.entry.response);
       }
 
-      // Cache MISS
-      this.stats.cacheMisses++;
-      this.updateHitRate();
+      // Cache MISS - protect with mutex
+      await this.statsMutex.runExclusive(async () => {
+        this.stats.cacheMisses++;
+        this.updateHitRate();
+      });
 
       logger.debug(
         {
@@ -381,7 +446,7 @@ export class SemanticCache {
   /**
    * Record a cache hit
    */
-  private recordHit(entryId: string, similarity: number): void {
+  private async recordHit(entryId: string, similarity: number): Promise<void> {
     const now = Date.now();
 
     this.db
@@ -395,15 +460,18 @@ export class SemanticCache {
       )
       .run(now, entryId);
 
-    this.stats.cacheHits++;
-    this.stats.tokensSaved += 100; // Rough estimate, can be improved
+    // Protect stats updates with mutex to prevent race conditions
+    await this.statsMutex.runExclusive(async () => {
+      this.stats.cacheHits++;
+      this.stats.tokensSaved += 100; // Rough estimate, can be improved
 
-    // Update average similarity
-    const prevTotal = this.stats.avgSimilarityOnHit * (this.stats.cacheHits - 1);
-    this.stats.avgSimilarityOnHit = (prevTotal + similarity) / this.stats.cacheHits;
+      // Update average similarity
+      const prevTotal = this.stats.avgSimilarityOnHit * (this.stats.cacheHits - 1);
+      this.stats.avgSimilarityOnHit = (prevTotal + similarity) / this.stats.cacheHits;
 
-    this.updateHitRate();
-    this.persistStats();
+      this.updateHitRate();
+      this.persistStats();
+    });
   }
 
   /**
@@ -537,7 +605,14 @@ export class SemanticCache {
    * Close database connection
    */
   close(): void {
+    // Stop auto-cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
     this.persistStats();
     this.db.close();
+    logger.info('SemanticCache closed');
   }
 }
