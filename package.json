@@ -1,6 +1,6 @@
 {
   "name": "securellm-bridge-mcp",
-  "version": "2.1.0",
+  "version": "2.0.0",
   "description": "MCP server for SecureLLM Bridge with Knowledge Management",
   "type": "module",
   "main": "build/index.js",

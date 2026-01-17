@@ -29,7 +29,7 @@
 
           src = ./.;
 
-          npmDepsHash = "sha256-KF7JPawB3W7jKO8gE5lqxWnZ9x3pMMJiHbKE1Ok5fUU=";
+          npmDepsHash = "sha256-tguduQ+LInsaOHdjeSTTgahQLqgRCL1tsKY6uCPSPt0=";
 
           buildPhase = ''
             npm run build
