@@ -22,8 +22,49 @@
           extensions = [ "rust-src" "rust-analyzer" "clippy" ];
         };
 
+        # Build the MCP server package
+        mcpServer = pkgs.buildNpmPackage {
+          pname = "securellm-bridge-mcp";
+          version = "2.1.0";
+
+          src = ./.;
+
+          npmDepsHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+          buildPhase = ''
+            npm run build
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin $out/lib/mcp-server
+
+            # Copy build output
+            cp -r build $out/lib/mcp-server/
+            cp package.json $out/lib/mcp-server/
+            cp -r node_modules $out/lib/mcp-server/
+
+            # Create executable wrapper
+            cat > $out/bin/securellm-mcp <<EOF
+            #!${pkgs.bash}/bin/bash
+            exec ${pkgs.nodejs}/bin/node $out/lib/mcp-server/build/src/index.js "\$@"
+            EOF
+            chmod +x $out/bin/securellm-mcp
+          '';
+
+          meta = with pkgs.lib; {
+            description = "MCP server for SecureLLM Bridge IDE integration";
+            license = licenses.mit;
+            maintainers = [ "kernelcore" ];
+          };
+        };
+
       in
       {
+        packages = {
+          default = mcpServer;
+          mcp = mcpServer;
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Node.js Environment (Legacy/Transition)
@@ -37,7 +78,7 @@
             pkg-config
             openssl
             sqlite
-            
+
             # Utils
             ripgrep
             jq
