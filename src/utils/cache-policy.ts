@@ -1,4 +1,5 @@
 const VOLATILE_TOOLS = new Set([
+  // System / monitoring — state changes constantly
   "server_status",
   "server_health",
   "workspace_quality_gate",
@@ -9,6 +10,22 @@ const VOLATILE_TOOLS = new Set([
   "thermal_warroom",
   "full_investigation",
   "browser_monitor_changes",
+  // ADR reads — backed by mutable files on disk
+  "adr_list",
+  "adr_show",
+  "adr_search",
+  "adr_relations",
+  "adr_validate",
+  // Chain reads — state appended over time
+  "chain_status",
+  "chain_verify",
+  "chain_prove",
+  // Other read-state tools that change when ADRs change
+  "snapshot_latest",
+  "economics_report",
+  "sbom_status",
+  "provenance_trace",
+  "governance_rules",
 ]);
 
 const MAX_CACHE_RESPONSE_BYTES = parseInt(
