@@ -50,3 +50,6 @@ cloudflared-*
 # OAuth secrets (keep directory structure via .gitkeep)
 secrets/oauth/*
 !secrets/oauth/.gitkeep
+
+# MCP server local config (machine-specific paths)
+.mcp.json
