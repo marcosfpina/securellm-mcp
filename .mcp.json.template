@@ -1,0 +1,15 @@
+{
+  "id": "${ID:-com.securellm.agent}",
+  "name": "${NAME:-SecureLLM MCP Agent}",
+  "version": "${VERSION:-0.1.0}",
+  "description": "${DESCRIPTION:-Public manifest for the MCP agent}",
+  "capabilities": [
+    "reasoning",
+    "knowledge",
+    "inference"
+  ],
+  "public": {
+    "homepage": "${HOMEPAGE:-}",
+    "contact": "${CONTACT:-}"
+  }
+}

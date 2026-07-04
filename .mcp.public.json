@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "securellm-voidnxlabs": {
+      "command": "curl",
+      "args": [
+        "-X",
+        "GET",
+        "https://api.voidnxlabs.io/mcp/endpoint"
+      ],
+      "env": {}
+    }
+  },
+  "public": {
+    "organization": "voidnxlabs",
+    "apiVersion": "1.0",
+    "endpoint": "https://api.voidnxlabs.io",
+    "documentation": "https://docs.voidnxlabs.io/mcp",
+    "softwares_registry": "https://api.voidnxlabs.io/softwares"
+  },
+  "capabilities": {
+    "tools": 99,
+    "categories": [
+      "security",
+      "devops",
+      "ai",
+      "system-analysis"
+    ]
+  }
+}
