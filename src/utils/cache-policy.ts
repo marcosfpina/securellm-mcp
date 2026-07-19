@@ -1,6 +1,10 @@
 const VOLATILE_TOOLS = new Set([
   "server_status",
   "server_health",
+  // ADR-0061: resposta depende do cwd/env da INSTÂNCIA, não dos args —
+  // cachear vaza o profile de uma sessão pra outra (cache é compartilhado
+  // via Cerebro).
+  "get_project_context",
   "workspace_quality_gate",
   "rate_limiter_status",
   "cache_stats",
