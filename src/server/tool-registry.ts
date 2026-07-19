@@ -5,6 +5,7 @@ import { executeInSandboxTool } from "../tools/secure-execution.js";
 import { gitSherlockTool } from "../tools/git-sherlock.js";
 import { sessionBridgeTool } from "../tools/session-bridge.js";
 import { nvimContextTool } from "../tools/nvim-context.js";
+import { projectContextTool } from "../tools/project-context.js";
 import { ecosystemTools } from "../tools/ecosystem-tools.js";
 import { umbrellaTools } from "../tools/umbrella-tools.js";
 import { uxTools } from "../tools/bridge-ux.js";
@@ -56,6 +57,7 @@ export function buildToolCatalog(
     browserLaunchAdvancedSchema,
 
     // ── Context & ecosystem ───────────────────────────────────────────
+    projectContextTool,
     sessionBridgeTool,
     gitSherlockTool,
     nvimContextTool,

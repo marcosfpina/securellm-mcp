@@ -113,6 +113,7 @@ import {
   handleUxCreateSpec,
 } from "../tools/bridge-ux.js";
 import { usageTracker } from "../telemetry/usage-tracker.js";
+import { handleProjectContext } from "../tools/project-context.js";
 
 const execAsync = promisify(exec);
 
@@ -166,6 +167,9 @@ export function buildDispatchMap(deps: DispatchDeps): Record<string, Handler> {
       ],
     }),
     rate_limiter_status: () => deps.getRateLimiterStatus(),
+    get_project_context: async () => ({
+      content: [{ type: "text", text: stringify(handleProjectContext()) }],
+    }),
     cache_stats: async () => ({
       content: [
         {
