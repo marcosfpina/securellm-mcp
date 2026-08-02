@@ -44,7 +44,7 @@ export class PreActionInterceptor {
   private adrInjector: ADRContextInjector;
 
   constructor(private contextManager: ContextManager) {
-    const adrRepoPath = process.env.ADR_REPO_PATH || "/home/kernelcore/master/adr-ledger";
+    const adrRepoPath = process.env.ADR_REPO_PATH || "/home/kernelcore/Projects/master/deploy/adr-ledger";
     this.adrInjector = new ADRContextInjector(adrRepoPath);
   }
 

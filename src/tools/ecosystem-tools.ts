@@ -15,7 +15,7 @@ import type { McpToolResult } from "../server/wrap.js";
 
 // ─── Ecosystem Root ───────────────────────────────────────────────────────────
 
-const ECOSYSTEM_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "master");
+const ECOSYSTEM_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "Projects", "master", "deploy");
 const EXCLUDED_DIRS = new Set([
   ".claude",
   ".github",
