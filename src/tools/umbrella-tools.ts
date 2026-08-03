@@ -19,7 +19,7 @@ import { stringifyGeneric } from "../utils/json-schemas.js";
 
 // ─── Umbrella Constants ─────────────────────────────────────────────────────
 
-const MASTER_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "master");
+const MASTER_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "Projects", "master", "deploy");
 
 const UMBRELLA_REPOS: Record<string, { name: string; lang: string; port?: number; role?: string }> = {
   neotron: { name: "neotron", lang: "Python", port: 8000 },
@@ -34,6 +34,7 @@ const UMBRELLA_REPOS: Record<string, { name: string; lang: string; port?: number
   phantom: { name: "phantom", lang: "Python" },
   "voidnx-api": { name: "voidnx-api", lang: "TypeScript" },
   neoland: { name: "neoland", lang: "TypeScript" },
+  "adr-ledger": { name: "adr-ledger", lang: "Rust", role: "ADR Governance Ledger" },
 };
 
 const SEARCH_EXCLUDED = [

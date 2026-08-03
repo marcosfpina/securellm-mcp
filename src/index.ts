@@ -46,6 +46,7 @@ import { createProfessionalToolHandlers } from "./tools/professional-tools.js";
 import { ResponseSummarizer } from "./utils/response-summarizer.js";
 import { shouldAttemptSemanticCache, shouldStoreSemanticCache } from "./utils/cache-policy.js";
 import { ToolGovernanceManager } from "./utils/tool-governance.js";
+import { applyActiveProfile } from "./config/profiles.js";
 import { DisposableRegistry } from "./utils/disposable.js";
 import crypto from "crypto";
 
@@ -134,6 +135,10 @@ class SecureLLMBridgeMCPServer {
       parseInt(process.env.REQUEST_DEDUPE_STALE_TIMEOUT || "60000", 10),
       parseInt(process.env.REQUEST_DEDUPE_CLEANUP_INTERVAL || "30000", 10)
     );
+    // ADR-0061: resolve o profile do repo (cwd da sessão) e alimenta o
+    // contrato de env da governança ANTES do manager nascer. Env explícito
+    // vence; sem profiles.json a chamada é no-op.
+    applyActiveProfile();
     this.toolGovernance = new ToolGovernanceManager();
     this.professionalToolHandlers = createProfessionalToolHandlers({
       getProjectRoot: () => this.projectRoot,
@@ -533,7 +538,13 @@ class SecureLLMBridgeMCPServer {
     const dispatchMap = buildDispatchMap(deps);
 
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: this.toolGovernance.sortTools(buildToolCatalog(this.db, ENABLE_KNOWLEDGE)),
+      // ADR-0061: a superfície listada respeita a mesma decisão de
+      // governança da execução — tool bloqueada não é anunciada.
+      tools: this.toolGovernance.sortTools(
+        buildToolCatalog(this.db, ENABLE_KNOWLEDGE).filter(
+          (tool) => this.toolGovernance.canExecute(tool).allowed
+        )
+      ),
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {

@@ -15,6 +15,52 @@ describe("semantic cache policy", () => {
     assert.equal(shouldAttemptSemanticCache("package_diagnose"), true);
   });
 
+  it("should skip ledger mutators — response depends on disk state, not args", () => {
+    for (const tool of [
+      "adr_new",
+      "adr_new_from_research",
+      "adr_accept",
+      "adr_supersede",
+      "adr_pre_sign",
+      "chain_sign",
+      "snapshot_create",
+      "sbom_generate",
+    ]) {
+      assert.equal(shouldAttemptSemanticCache(tool), false, `${tool} must not be cached`);
+    }
+  });
+
+  it("should skip ledger state probes — cached probe returns a stale gate", () => {
+    for (const tool of [
+      "adr_gate",
+      "adr_validate",
+      "chain_status",
+      "chain_verify",
+      "snapshot_latest",
+      "sbom_status",
+    ]) {
+      assert.equal(shouldAttemptSemanticCache(tool), false, `${tool} must not be cached`);
+    }
+  });
+
+  it("should skip non-ledger mutators (cache replay would skip real execution)", () => {
+    assert.equal(shouldAttemptSemanticCache("cerebro_rag_ingest"), false);
+    assert.equal(shouldAttemptSemanticCache("execute_in_sandbox"), false);
+  });
+
+  it("should never store a volatile tool response, even a valid one", () => {
+    // Regressão: adr_new com args idênticos devolvia gate "blocked" obsoleto
+    // do cache após a duplicata já ter sido corrigida em disco.
+    assert.equal(
+      shouldStoreSemanticCache({
+        toolName: "adr_new",
+        result: { content: [{ type: "text", text: '{"success":false,"blocked":true}' }] },
+        responseSize: 128,
+      }),
+      false
+    );
+  });
+
   it("should reject cache storage for error results", () => {
     assert.equal(isCacheableResult({ isError: true, content: [] }), false);
     assert.equal(

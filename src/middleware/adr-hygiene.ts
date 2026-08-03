@@ -49,7 +49,7 @@ export class ADRHygieneMiddleware {
       options?.checkInterval ??
       (parseInt(process.env.ADR_HYGIENE_INTERVAL || "", 10) || DEFAULT_CHECK_INTERVAL);
     this.repoPath =
-      options?.repoPath ?? (process.env.ADR_REPO_PATH || "/home/kernelcore/master/adr-ledger");
+      options?.repoPath ?? (process.env.ADR_REPO_PATH || "/home/kernelcore/Projects/master/deploy/adr-ledger");
   }
 
   /**
