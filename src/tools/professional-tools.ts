@@ -118,6 +118,19 @@ const ciFailureSummarySchema = z
       .optional()
       .default(40000)
       .describe("Maximum amount of log text to analyze after trimming"),
+    max_structured_entries: z
+      .number()
+      .int()
+      .min(5)
+      .max(200)
+      .optional()
+      .default(40)
+      .describe("Maximum number of structured log entries to return, prioritizing errors first"),
+    log_level_filter: z
+      .enum(["error", "warning", "notice", "all"])
+      .optional()
+      .default("all")
+      .describe("Narrow structured log entries to a single severity level, or 'all' for every level"),
   })
   .refine((value) => Boolean(value.log_text || value.log_file || value.run_id), {
     message: "Provide at least one of log_text, log_file, or run_id",
@@ -225,6 +238,25 @@ interface GithubActionsContext {
   likelyStepName: string | null;
   annotations: string[];
   runnerLines: string[];
+}
+
+interface StructuredLogEntry {
+  timestamp: string | null;
+  job: string | null;
+  step: string | null;
+  level: "error" | "warning" | "notice" | "info";
+  message: string;
+}
+
+interface StructuredLog {
+  entries: StructuredLogEntry[];
+  total_lines: number;
+  error_count: number;
+  warning_count: number;
+  notice_count: number;
+  first_timestamp: string | null;
+  last_timestamp: string | null;
+  duration_ms: number | null;
 }
 
 interface GithubRunJob {
@@ -402,6 +434,130 @@ function extractGithubActionsContext(logText: string): GithubActionsContext {
   };
 }
 
+const GH_LOG_LINE_RE = /^(?:([^\t]*)\t([^\t]*)\t)?(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s?(.*)$/;
+
+function classifyLogLevel(message: string): StructuredLogEntry["level"] {
+  if (
+    /##\[error\]|error TS\d+:|AssertionError|npm ERR!|pnpm ERR!|yarn error|Cannot find module|not ok \d+|Process completed with exit code [1-9]/i.test(
+      message
+    )
+  ) {
+    return "error";
+  }
+  if (/##\[warning\]|\bwarn(ing)?\b/i.test(message)) {
+    return "warning";
+  }
+  if (/##\[notice\]|##\[group\]|##\[endgroup\]/i.test(message)) {
+    return "notice";
+  }
+  return "info";
+}
+
+/**
+ * Turns raw CI log text into timestamped, job/step-attributed entries.
+ * Tolerant of `gh run view --log`'s `job\tstep\ttimestamp message` lines and of
+ * plain runner log lines with no job/step/timestamp prefix at all.
+ */
+function parseGithubActionsLog(
+  logText: string,
+  opts: { maxEntries: number; levelFilter: "error" | "warning" | "notice" | "all" }
+): StructuredLog {
+  const lines = logText.split("\n");
+  let currentStep: string | null = null;
+  const signalEntries: StructuredLogEntry[] = [];
+  let errorCount = 0;
+  let warningCount = 0;
+  let noticeCount = 0;
+  let firstTimestamp: string | null = null;
+  let lastTimestamp: string | null = null;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line.trim()) continue;
+
+    const match = line.match(GH_LOG_LINE_RE);
+    let job: string | null = null;
+    let step: string | null = null;
+    let timestamp: string | null = null;
+    let message = line;
+
+    if (match) {
+      job = match[1]?.trim() || null;
+      step = match[2]?.trim() || null;
+      timestamp = match[3] || null;
+      message = (match[4] ?? "").trim();
+    }
+
+    const stepMatch =
+      message.match(/^##\[group\]Run\s+(.+)$/) ||
+      message.match(/^Run\s+(.+)$/) ||
+      message.match(/^##\[group\](.+)$/);
+    if (stepMatch?.[1]) {
+      currentStep = stepMatch[1].trim();
+    }
+
+    if (timestamp) {
+      firstTimestamp = firstTimestamp ?? timestamp;
+      lastTimestamp = timestamp;
+    }
+
+    const level = classifyLogLevel(message);
+    if (level === "error") errorCount++;
+    else if (level === "warning") warningCount++;
+    else if (level === "notice") noticeCount++;
+    else continue; // keep the entry list focused on signal, not routine info lines
+
+    signalEntries.push({
+      timestamp,
+      job,
+      step: step || currentStep,
+      level,
+      message: message.slice(0, 500),
+    });
+  }
+
+  const levelPriority: Record<"error" | "warning" | "notice", number> = {
+    error: 0,
+    warning: 1,
+    notice: 2,
+  };
+  const filtered =
+    opts.levelFilter === "all"
+      ? signalEntries
+      : signalEntries.filter((entry) => entry.level === opts.levelFilter);
+  filtered.sort(
+    (a, b) =>
+      levelPriority[a.level as "error" | "warning" | "notice"] -
+      levelPriority[b.level as "error" | "warning" | "notice"]
+  );
+
+  const seen = new Set<string>();
+  const entries: StructuredLogEntry[] = [];
+  for (const entry of filtered) {
+    const key = `${entry.level}:${entry.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(entry);
+    if (entries.length >= opts.maxEntries) break;
+  }
+
+  const durationMs =
+    firstTimestamp && lastTimestamp
+      ? Math.max(0, new Date(lastTimestamp).getTime() - new Date(firstTimestamp).getTime())
+      : null;
+
+  return {
+    entries,
+    total_lines: lines.length,
+    error_count: errorCount,
+    warning_count: warningCount,
+    notice_count: noticeCount,
+    first_timestamp: firstTimestamp,
+    last_timestamp: lastTimestamp,
+    duration_ms: durationMs,
+  };
+}
+
 function detectCiPatterns(logText: string): CiPatternMatch[] {
   const patterns: CiPatternMatch[] = [];
   const lower = logText.toLowerCase();
@@ -526,11 +682,18 @@ function extractFailureSignals(logText: string): string[] {
   return uniqueLines(matches, 8);
 }
 
-function summarizeCiFailure(logText: string) {
+function summarizeCiFailure(
+  logText: string,
+  structuredLogOptions: { maxEntries: number; levelFilter: "error" | "warning" | "notice" | "all" } = {
+    maxEntries: 40,
+    levelFilter: "all",
+  }
+) {
   const patterns = detectCiPatterns(logText);
   const topPattern = patterns[0];
   const failureSignals = extractFailureSignals(logText);
   const actionsContext = extractGithubActionsContext(logText);
+  const structuredLog = parseGithubActionsLog(logText, structuredLogOptions);
 
   return {
     summary: topPattern?.title || "Unknown CI failure",
@@ -545,6 +708,7 @@ function summarizeCiFailure(logText: string) {
       6
     ),
     github_actions_context: actionsContext,
+    structured_log: structuredLog,
   };
 }
 
@@ -644,7 +808,10 @@ async function triageGithubRun(
   ]);
 
   const logText = logResult.stdout || logResult.stderr || "";
-  const summary = summarizeCiFailure(trimLogForAnalysis(logText, maxLogChars));
+  const summary = summarizeCiFailure(trimLogForAnalysis(logText, maxLogChars), {
+    maxEntries: 5,
+    levelFilter: "all",
+  });
   let githubRun = null as ReturnType<typeof summarizeGithubRunMetadata> | null;
 
   if (metadataResult.exitCode === 0 && metadataResult.stdout.trim()) {
@@ -667,6 +834,7 @@ async function triageGithubRun(
     github_actions_step: summary.github_actions_context.likelyStepName,
     github_actions_annotations: summary.github_actions_context.annotations,
     github_run: githubRun,
+    structured_log: summary.structured_log,
     log_available: Boolean(logText.trim()),
     log_error:
       logResult.exitCode === 0
@@ -1413,7 +1581,10 @@ export function createProfessionalToolHandlers(deps: ProfessionalToolDeps) {
       }
 
       const trimmedLog = trimLogForAnalysis(logText, args.max_log_chars);
-      const summary = summarizeCiFailure(trimmedLog);
+      const summary = summarizeCiFailure(trimmedLog, {
+        maxEntries: args.max_structured_entries,
+        levelFilter: args.log_level_filter,
+      });
       let githubRun = null as ReturnType<typeof summarizeGithubRunMetadata> | null;
 
       if (args.run_id && args.include_github_metadata) {
@@ -1462,6 +1633,11 @@ export function createProfessionalToolHandlers(deps: ProfessionalToolDeps) {
                 ...(githubRun?.failed_job?.name
                   ? [
                       `Start with the failed job '${githubRun.failed_job.name}' before reviewing successful jobs.`,
+                    ]
+                  : []),
+                ...(summary.structured_log.duration_ms !== null
+                  ? [
+                      `This span ran for ~${Math.round(summary.structured_log.duration_ms / 1000)}s before failing, based on the log timestamps.`,
                     ]
                   : []),
               ],

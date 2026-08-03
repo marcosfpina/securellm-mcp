@@ -299,6 +299,63 @@ describe("professional tools", () => {
     assert.ok(payload.runner_context.some((line: string) => line.includes("runner version")));
   });
 
+  it("should extract structured, timestamped log entries with job/step attribution", async () => {
+    const handlers = createProfessionalToolHandlers({
+      getProjectRoot: () => process.cwd(),
+      getServerStatus: async () => ({}),
+    });
+
+    const result = await handlers.ci_failure_summary({
+      log_text: [
+        "build\tRun npm test\t2024-01-15T10:00:00.0000000Z ##[group]Run npm test",
+        "build\tRun npm test\t2024-01-15T10:00:01.0000000Z npm test",
+        "build\tRun npm test\t2024-01-15T10:00:05.0000000Z AssertionError [ERR_ASSERTION]: Expected true but got false.",
+        "build\tRun npm test\t2024-01-15T10:00:06.0000000Z ##[warning]Retrying flaky step",
+        "build\tRun npm test\t2024-01-15T10:00:10.0000000Z ##[error]Process completed with exit code 1.",
+      ].join("\n"),
+    });
+    const payload = JSON.parse(result.content[0].text);
+
+    assert.ok(payload.structured_log.error_count >= 2);
+    assert.equal(payload.structured_log.warning_count, 1);
+    assert.ok(
+      payload.structured_log.entries.some(
+        (entry: { job: string; step: string; level: string }) =>
+          entry.job === "build" && entry.step === "Run npm test" && entry.level === "error"
+      )
+    );
+    assert.equal(payload.structured_log.first_timestamp, "2024-01-15T10:00:00.0000000Z");
+    assert.equal(payload.structured_log.last_timestamp, "2024-01-15T10:00:10.0000000Z");
+    assert.ok((payload.structured_log.duration_ms as number) >= 10000);
+    assert.ok(payload.guidance.some((line: string) => line.includes("This span ran for")));
+  });
+
+  it("should narrow structured log entries with log_level_filter", async () => {
+    const handlers = createProfessionalToolHandlers({
+      getProjectRoot: () => process.cwd(),
+      getServerStatus: async () => ({}),
+    });
+
+    const result = await handlers.ci_failure_summary({
+      log_text: [
+        "2024-01-15T10:00:00.0000000Z ##[warning]Node 18 is deprecated for this action",
+        "2024-01-15T10:00:01.0000000Z AssertionError [ERR_ASSERTION]: Expected true but got false.",
+        "2024-01-15T10:00:02.0000000Z ##[error]Process completed with exit code 1.",
+      ].join("\n"),
+      log_level_filter: "error",
+    });
+    const payload = JSON.parse(result.content[0].text);
+
+    assert.ok(payload.structured_log.entries.length > 0);
+    assert.ok(
+      payload.structured_log.entries.every(
+        (entry: { level: string }) => entry.level === "error"
+      )
+    );
+    // Aggregate counts still reflect the whole log, independent of the filter.
+    assert.equal(payload.structured_log.warning_count, 1);
+  });
+
   it("should expose tool governance through tool_control_plane", async () => {
     const handlers = createProfessionalToolHandlers({
       getProjectRoot: () => process.cwd(),
@@ -478,5 +535,12 @@ describe("professional tools", () => {
     assert.ok(payload.top_failed_jobs.some((item: { job: string }) => item.job === "build"));
     assert.ok(payload.top_failed_jobs.some((item: { job: string }) => item.job === "test"));
     assert.equal(payload.repositories.length, 2);
+
+    for (const repoReport of payload.repositories) {
+      for (const run of repoReport.runs) {
+        assert.ok(Array.isArray(run.structured_log.entries));
+        assert.ok(run.structured_log.entries.length <= 5);
+      }
+    }
   });
 });
