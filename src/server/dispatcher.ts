@@ -76,6 +76,7 @@ import {
 import { handleNvimContext } from "../tools/nvim-context.js";
 import { handleNixDaemon } from "../tools/nix-daemon.js";
 import { handleGitSherlock } from "../tools/git-sherlock.js";
+import { gitOpsHandlers } from "../tools/git/index.js";
 import { handleNotifyHook } from "../tools/notify-hook.js";
 import { handleMetaTool } from "../tools/meta-tool.js";
 import {
@@ -442,6 +443,15 @@ export function buildDispatchMap(deps: DispatchDeps): Record<string, Handler> {
     server_health: (args) => deps.professionalToolHandlers.server_health(args),
     performance_report: (args) => deps.professionalToolHandlers.performance_report(args),
     tool_control_plane: (args) => deps.professionalToolHandlers.tool_control_plane(args),
+    // ADR-0062 (B1): estavam no catálogo e implementadas, mas sem dispatch —
+    // tools/list anunciava-as e tools/call devolvia MethodNotFound.
+    // workspace_quality_gate só era alcançável indiretamente, pelo default de
+    // quality_gate, apesar de anunciada por nome e listada em VOLATILE_TOOLS.
+    workspace_quality_gate: (args) => deps.professionalToolHandlers.workspace_quality_gate(args),
+    cache_tuning_advisor: (args) => deps.professionalToolHandlers.cache_tuning_advisor(args),
+    change_impact: (args) => deps.professionalToolHandlers.change_impact(args),
+    ci_failure_summary: (args) => deps.professionalToolHandlers.ci_failure_summary(args),
+    ci_batch_triage: (args) => deps.professionalToolHandlers.ci_batch_triage(args),
 
     // ── Session / Context / Misc ──────────────────────────────────────────
     session_bridge: (args) =>
@@ -453,6 +463,11 @@ export function buildDispatchMap(deps: DispatchDeps): Record<string, Handler> {
     nvim_context: (args) => handleNvimContext(args),
     nix_daemon: (args) => handleNixDaemon(args),
     git_sherlock: (args) => handleGitSherlock(args),
+
+    // ── Git operations (ADR-0062) ─────────────────────────────────────────
+    git_fleet: (args) => gitOpsHandlers.git_fleet(args),
+    git_workbench: (args) => gitOpsHandlers.git_workbench(args),
+    git_release: (args) => gitOpsHandlers.git_release(args),
     notify_hook: (args) => handleNotifyHook(args),
     meta_tool: (args) =>
       handleMetaTool(args, async (toolName, toolArgs) => {

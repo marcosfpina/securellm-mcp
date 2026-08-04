@@ -129,6 +129,52 @@ Laptop protection during intensive operations:
 - **Forensic Analysis**: Post-build thermal profiling with detailed reports
 - **War Room Mode**: Live monitoring during critical operations
 
+### 🌿 Git Operations (ADR-0062)
+
+Professional git tooling across the whole ecosystem, not just the server's own
+working directory. Every command is built as argv — never a shell string — and
+runs against an explicitly resolved repository.
+
+| Tool | What it answers | Writes? |
+|------|-----------------|---------|
+| `git_sherlock` | Forensics on one repo: blame heatmap, churn, authors, file history, branch inventory, divergence, commit lint, release readiness, regression range | No |
+| `git_fleet` | "What is dirty, unpushed, behind, or stale across every repo?" | No |
+| `git_workbench` | Stage, commit, branch, tag, stash, worktree | Yes — guarded |
+| `git_release` | "Can I ship?" — ship gate, changelog, semver bump, PR status | No |
+
+**Write safety.** `git_workbench` is the only tool in the server that mutates a
+repository, and it plans instead of executing unless told twice:
+
+```jsonc
+// 1. Default — plans, changes nothing
+{ "action": "commit", "repo": "neoland", "type": "feat",
+  "message": "add topology view", "reason": "shipping the dashboard work" }
+// → status: "planned", with the exact argv that would run
+
+// 2. dry_run:false alone is still not enough
+// → status: "confirmation_required"
+
+// 3. Both flags, and only then
+{ "...": "...", "dry_run": false, "confirm": true }
+// → status: "executed"
+```
+
+`reason` is required for every mutating action and is written to the audit log
+(`~/.local/state/securellm-mcp/mcp.log`), one entry per planned, executed,
+failed, and denied command.
+
+**Denied by policy** — the guard is an allowlist, so anything unlisted fails
+closed: `push`, `pull`, any `--force`, `reset --hard`, `clean -fd`, `--amend`,
+`--no-verify`, `rebase`, `merge`, `checkout`, `remote`, `filter-branch`,
+`stash drop/clear`, `branch -D`, and the global options that can redirect git
+outside the repo (`-c`, `-C`, `--git-dir`, `--exec-path`). GitHub access is
+read-only `gh` (`pr view/list/checks/diff/status`); `gh pr create` and
+`gh pr merge` are denied. Set `GIT_OPS_WRITES_ENABLED=false` to disable every
+mutation, or `TOOL_DISABLED_LIST=git_workbench` to remove the tool entirely.
+
+The guard is position-aware, so a commit message that happens to read
+`--force` is a message, while `--force` in flag position is a denial.
+
 ### 🔍 Hybrid Reasoning (Beta)
 
 Next-generation AI capabilities currently in development:

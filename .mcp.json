@@ -1,16 +1,100 @@
 {
   "mcpServers": {
     "securellm": {
-      "command": "node",
-      "args": ["${SECURELLM_MCP_BUILD:-build/src/index.js}"],
+      "command": "nix",
+      "args": [
+        "develop",
+        "/home/kernelcore/master/securellm-mcp",
+        "--command",
+        "bash",
+        "-lc",
+        "cd \"/home/kernelcore/master/securellm-mcp\" && exec node \"/home/kernelcore/master/securellm-mcp/build/src/index.js\""
+      ],
       "env": {
+        "PROJECT_ROOT": "/home/kernelcore/master/securellm-mcp",
         "ENABLE_KNOWLEDGE": "true",
-        "LOG_LEVEL": "info"
+        "LLAMA_CPP_URL": "http://localhost:8081",
+        "PHANTOM_URL": "http://localhost:8008",
+        "CEREBRO_API_URL": "http://localhost:8009",
+        "NATS_URL": "nats://localhost:4222",
+        "SECURELLM_MCP_QUIET": "1"
       }
+    }
+  },
+  "capabilities": {
+    "tools": {
+      "count": 63,
+      "names": [
+        "adr_accept",
+        "adr_gate",
+        "adr_list",
+        "adr_new",
+        "adr_new_from_research",
+        "adr_pre_sign",
+        "adr_relations",
+        "adr_search",
+        "adr_show",
+        "adr_supersede",
+        "adr_validate",
+        "browser_launch_advanced",
+        "cache_stats",
+        "cache_tuning_advisor",
+        "cerebro_rag_benchmark",
+        "cerebro_rag_ingest",
+        "cerebro_rag_query",
+        "cerebro_rag_status",
+        "chain_prove",
+        "chain_sign",
+        "chain_status",
+        "chain_verify",
+        "change_impact",
+        "ci_batch_triage",
+        "ci_failure_summary",
+        "code_analyze",
+        "context_window_optimizer",
+        "cross_project_search",
+        "dependency_graph_analyzer",
+        "economics_report",
+        "ecosystem_map",
+        "ecosystem_search",
+        "ecosystem_trace",
+        "execute_in_sandbox",
+        "get_project_context",
+        "git_fleet",
+        "git_release",
+        "git_sherlock",
+        "git_workbench",
+        "governance_rules",
+        "memories",
+        "nvim_context",
+        "performance_report",
+        "project_context_switcher",
+        "provenance_trace",
+        "quality_gate",
+        "sbom_generate",
+        "sbom_status",
+        "search",
+        "server_health",
+        "server_status",
+        "session_bridge",
+        "snapshot_create",
+        "snapshot_latest",
+        "system",
+        "tool_control_plane",
+        "ux_create_spec",
+        "ux_design_system",
+        "ux_generate_prompt",
+        "ux_get_spec",
+        "ux_list_specs",
+        "ux_validate_component",
+        "workspace_quality_gate"
+      ]
     }
   },
   "_generated": {
     "by": "scripts/generate-mcp-manifest.ts",
-    "version": "2.1.0"
+    "adr": "ADR-0057",
+    "method": "MCP tools/list (server-side, 100% accurate)",
+    "at": "2026-08-04T06:37:12.052Z"
   }
 }

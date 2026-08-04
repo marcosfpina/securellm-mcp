@@ -35,6 +35,14 @@ const VOLATILE_TOOLS = new Set([
   "thermal_warroom",
   "full_investigation",
   "browser_monitor_changes",
+  // ADR-0062: as tools de git leem o working tree e as refs no instante da
+  // chamada, não os args. O cache é compartilhado entre sessões via Cerebro,
+  // então cachear devolve "repo limpo" depois de um commit — e, no caso do
+  // git_workbench, um replay pularia a execução real de uma mutação.
+  "git_sherlock",
+  "git_fleet",
+  "git_workbench",
+  "git_release",
 ]);
 
 const MAX_CACHE_RESPONSE_BYTES = parseInt(

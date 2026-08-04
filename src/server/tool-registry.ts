@@ -16,6 +16,7 @@ import {
   browserLaunchAdvancedSchema,
 } from "../tools/browser/index.js";
 import { cerebroRagTools } from "../tools/cerebro-rag.js";
+import { gitOpsTools } from "../tools/git/index.js";
 
 export function buildToolCatalog(
   db: KnowledgeDatabase | null,
@@ -69,6 +70,9 @@ export function buildToolCatalog(
 
     // ── UX design mode ────────────────────────────────────────────────
     ...uxTools,
+
+    // ── Git operations (ADR-0062) ─────────────────────────────────────
+    ...gitOpsTools,
 
     // ── Professional operations ───────────────────────────────────────
     ...professionalTools,

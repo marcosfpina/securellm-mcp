@@ -7,6 +7,15 @@ classification: major
 project: "GLOBAL"
 ---
 
+> **Estendida pela [ADR-0062](ADR-0062-git-operations.md)** (2026-08-04).
+> A `git_sherlock` mantém-se, com cinco ações novas (`branch_inventory`,
+> `divergence`, `release_readiness`, `commit_lint`, `regression_range`) e três
+> defeitos corrigidos: injeção de comando via `shell: true`, ausência de `cwd`
+> (analisava sempre o cwd do servidor, não o repo pedido) e falhas engolidas
+> por `.catch(() => ({ stdout: "" }))`. As operações de escrita que esta ADR
+> deliberadamente excluiu vivem agora na `git_workbench`, sob allowlist,
+> `dry_run` por default e auditoria.
+
 ## Context
 
 O projeto tem 481 arquivos dirty no git. Isso é normal em desenvolvimento ativo, mas:
