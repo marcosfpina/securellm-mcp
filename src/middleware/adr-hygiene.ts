@@ -15,6 +15,7 @@ import { readFile, readdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { logger } from "../utils/logger.js";
+import { resolveAdrLedgerPath } from "../config/workspace.js";
 
 export interface ADRHygieneReport {
   needsAttention: boolean;
@@ -48,8 +49,8 @@ export class ADRHygieneMiddleware {
     this.checkInterval =
       options?.checkInterval ??
       (parseInt(process.env.ADR_HYGIENE_INTERVAL || "", 10) || DEFAULT_CHECK_INTERVAL);
-    this.repoPath =
-      options?.repoPath ?? (process.env.ADR_REPO_PATH || "/home/kernelcore/Projects/master/deploy/adr-ledger");
+    // ADR-0062 (B4): path do ledger resolvido, não hardcoded.
+    this.repoPath = options?.repoPath ?? resolveAdrLedgerPath();
   }
 
   /**

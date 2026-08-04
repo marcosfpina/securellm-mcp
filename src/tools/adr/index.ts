@@ -22,8 +22,12 @@ import { ADRRuntimeGate, FilesystemScanner } from "./runtime-gate.js";
 import type { RuntimeGateResult, ScannedADR } from "./runtime-gate.js";
 import { existsSync } from "fs";
 import { join } from "path";
+import { resolveAdrLedgerPath } from "../../config/workspace.js";
 
-const DEFAULT_ADR_LEDGER_PATH = "/home/kernelcore/Projects/master/deploy/adr-ledger";
+// ADR-0062 (B4): o default do ledger é resolvido por prova de existência (ver
+// src/config/workspace.ts). A cadeia de precedência abaixo — que prefere o cwd
+// quando este tem layout ADR — fica deliberadamente inalterada.
+const DEFAULT_ADR_LEDGER_PATH = resolveAdrLedgerPath();
 
 function hasAdrLayout(repoPath: string): boolean {
   return existsSync(join(repoPath, "adr")) || existsSync(join(repoPath, "docs", "adr"));

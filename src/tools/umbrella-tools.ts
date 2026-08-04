@@ -16,10 +16,15 @@ import * as path from "path";
 import { execa } from "execa";
 import type { ExtendedTool } from "../types/mcp-tool-extensions.js";
 import { stringifyGeneric } from "../utils/json-schemas.js";
+import { getEcosystemRoot } from "../config/workspace.js";
 
 // ─── Umbrella Constants ─────────────────────────────────────────────────────
 
-const MASTER_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "Projects", "master", "deploy");
+// ADR-0062 (B4): resolvido por prova de existência (ver src/config/workspace.ts),
+// não hardcoded. O valor anterior apontava para ~/Projects/master/deploy, que
+// contém apenas certs/ e nginx/ — cross_project_search e companhia respondiam
+// sobre zero projetos sem nunca falhar.
+const MASTER_ROOT = getEcosystemRoot();
 
 const UMBRELLA_REPOS: Record<string, { name: string; lang: string; port?: number; role?: string }> = {
   neotron: { name: "neotron", lang: "Python", port: 8000 },

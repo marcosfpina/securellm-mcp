@@ -12,10 +12,12 @@ import * as path from "path";
 import type { ExtendedTool } from "../types/mcp-tool-extensions.js";
 import { stringifyGeneric } from "../utils/json-schemas.js";
 import type { McpToolResult } from "../server/wrap.js";
+import { getEcosystemRoot } from "../config/workspace.js";
 
 // ─── Ecosystem Root ───────────────────────────────────────────────────────────
 
-const ECOSYSTEM_ROOT = path.resolve(process.env.HOME || "/home/kernelcore", "Projects", "master", "deploy");
+// ADR-0062 (B4): ver src/config/workspace.ts.
+const ECOSYSTEM_ROOT = getEcosystemRoot();
 const EXCLUDED_DIRS = new Set([
   ".claude",
   ".github",

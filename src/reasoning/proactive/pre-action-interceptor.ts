@@ -11,6 +11,7 @@
 import type { ContextManager } from "../context-manager.js";
 import type { EnrichedContext } from "../../types/context-inference.js";
 import { ADRContextInjector } from "./adr-context-injector.js";
+import { resolveAdrLedgerPath } from "../../config/workspace.js";
 
 export interface PreAction {
   type:
@@ -44,8 +45,8 @@ export class PreActionInterceptor {
   private adrInjector: ADRContextInjector;
 
   constructor(private contextManager: ContextManager) {
-    const adrRepoPath = process.env.ADR_REPO_PATH || "/home/kernelcore/Projects/master/deploy/adr-ledger";
-    this.adrInjector = new ADRContextInjector(adrRepoPath);
+    // ADR-0062 (B4): path do ledger resolvido, não hardcoded.
+    this.adrInjector = new ADRContextInjector(resolveAdrLedgerPath());
   }
 
   /**
