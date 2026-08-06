@@ -53,3 +53,6 @@ secrets/oauth/*
 
 # SOPS secrets: commit the encrypted file, ignore plaintext intermediary
 secrets/secrets.yaml.plaintext
+
+# MCP server local config (machine-specific paths)
+.mcp.json

@@ -1,60 +1,20 @@
 {
   "mcpServers": {
-    "voidnx": {
-      "url": "https://api.voidnxlabs.io/mcp",
-      "headers": {
-        "Authorization": "Bearer ${VOIDNX_API_KEY}"
-      }
+    "securellm-voidnxlabs": {
+      "command": "curl",
+      "args": ["-X", "GET", "https://api.voidnxlabs.io/mcp/endpoint"],
+      "env": {}
     }
   },
-  "organization": "voidnxlabs",
-  "apiVersion": "0.0",
-  "documentation": "https://docs.voidnxlabs.io/mcp",
-  "tools": [
-    {
-      "name": "search",
-      "description": "Search the web, GitHub repos/code/issues, or run a deep research investigation.",
-      "parameters": {
-        "query": "string (required)",
-        "target": "\"web\" | \"github\" | \"research\"  (default: web)",
-        "depth": "[research] \"quick\" | \"standard\" | \"deep\""
-      }
-    },
-    {
-      "name": "code_analyze",
-      "description": "Analyze a codebase for complexity metrics, unused exports, or full structural patterns.",
-      "parameters": {
-        "mode": "\"complexity\" | \"dead_code\" | \"full\"  (default: complexity)",
-        "path": "file or directory path"
-      }
-    },
-    {
-      "name": "quality_gate",
-      "description": "Validate code quality: lint, run tests, check documentation, or run all checks.",
-      "parameters": {
-        "scope": "\"all\" | \"lint\" | \"test\" | \"docs\"  (default: all)",
-        "path": "target path"
-      }
-    },
-    {
-      "name": "git_sherlock",
-      "description": "Investigate git history: blame chains, commit patterns, authorship, and change archaeology.",
-      "parameters": {
-        "path": "repository path",
-        "query": "what to investigate"
-      }
-    },
-    {
-      "name": "ecosystem_map",
-      "description": "Map relationships and dependencies across a multi-repo ecosystem.",
-      "parameters": {
-        "scope": "project or ecosystem identifier"
-      }
-    },
-    {
-      "name": "server_health",
-      "description": "Check API availability and health status.",
-      "parameters": {}
-    }
-  ]
+  "public": {
+    "organization": "voidnxlabs",
+    "apiVersion": "1.0",
+    "endpoint": "https://api.voidnxlabs.io",
+    "documentation": "https://docs.voidnxlabs.io/mcp",
+    "softwares_registry": "https://api.voidnxlabs.io/softwares"
+  },
+  "capabilities": {
+    "tools": 60,
+    "categories": ["security", "devops", "ai", "system-analysis"]
+  }
 }
